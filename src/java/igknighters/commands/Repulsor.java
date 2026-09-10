@@ -130,7 +130,7 @@ public class Repulsor {
                                     / 3;
                 }
             }
-            // if robot is in the safezones (above/below bump), don't effect y repulsion
+            // if robot is in a safe zone, do not affect y repulsion
             for (Repulsor.obstacle safezones : obstacles) {
                 if (safezones.type == obstacleType.SAFE_ZONE
                         && currentPose.getX() >= obs.obstaclePose.getX() - obs.width

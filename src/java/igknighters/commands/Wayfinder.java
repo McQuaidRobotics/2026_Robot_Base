@@ -8,12 +8,12 @@ import igknighters.Robot;
 import igknighters.constants.FieldConstants;
 import igknighters.subsystems.swerve.Swerve;
 import java.util.Set;
-import vroom.Fields.REBUILT;
+import vroom.Fields.EmptyField;
 import vroom.PathFollower;
 import vroom.PathPlanner;
 
 public class Wayfinder {
-    static PathPlanner pathPlanner = new PathPlanner(new REBUILT(), 4);
+    static PathPlanner pathPlanner = new PathPlanner(new EmptyField(), 4);
     static PathFollower pathFollower = new PathFollower(1.0, 0, 0);
 
     public static Pose2d getSafeSpotLocation() {

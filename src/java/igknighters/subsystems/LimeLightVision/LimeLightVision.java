@@ -19,8 +19,8 @@ public class LimeLightVision extends SubsystemBase {
                     new LimeLightVisionReal(
                             SubsystemConstants.kLimelightVision.backCam,
                             SubsystemConstants.kLimelightVision.rightCam,
-                            SubsystemConstants.kLimelightVision.turretCam,
-                            SubsystemConstants.kLimelightVision.intakeCam);
+                            SubsystemConstants.kLimelightVision.primaryCam,
+                            SubsystemConstants.kLimelightVision.frontCam);
         } else {
             vision = new LimeLightVisionSim("1", "2", "3", "4");
         }

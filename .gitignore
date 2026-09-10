@@ -11,9 +11,6 @@
 *.o
 *.obj
 
-##GEMINI
-GEMINI.md
-
 # Precompiled Headers
 *.gch
 *.pch
@@ -197,3 +194,13 @@ compile_commands.json
 # Build data
 src/java/igknighters/BuildConstants.java
 *.wpilog
+
+### Agentic development files ###
+# Assistant instruction/config files are intentionally not tracked in this repo.
+GEMINI.md
+CLAUDE.md
+AGENTS.md
+.cursorrules
+.cursor/
+.aider*
+.github/copilot-instructions.md

@@ -10,13 +10,13 @@ public class SwerveConsts {
 
     public enum Robots {
         DEMO_BOT,
-        GEMINKNIGHT,
+        FIRST_BOT,
         SECOND_BOT,
         UNKNOWN
     };
 
     private String DEMO_BOT_SERIAL_NUMBER = "TBD";
-    private String GEMINKNIGHT_SERIAL_NUMBER = "032B4B20";
+    private String FIRST_BOT_SERIAL_NUMBER = "032B4B20";
     private String SECOND_BOT_SERIAL_NUMBER = "03260ABB";
 
     public Robots getRobot() {
@@ -29,11 +29,11 @@ public class SwerveConsts {
                 Log.log("ROBOT/ROBOT_INFO/ROBOT TYPE", "DEMO_BOT");
             }
             return Robots.DEMO_BOT;
-        } else if (robotSerialNumber.equals(GEMINKNIGHT_SERIAL_NUMBER)) {
+        } else if (robotSerialNumber.equals(FIRST_BOT_SERIAL_NUMBER)) {
             if (!Robot.consts.disableAllLogs()) {
-                Log.log("ROBOT/ROBOT_INFO/ROBOT TYPE", "GEMINKNIGHT");
+                Log.log("ROBOT/ROBOT_INFO/ROBOT TYPE", "FIRST_BOT");
             }
-            return Robots.GEMINKNIGHT;
+            return Robots.FIRST_BOT;
         } else if (robotSerialNumber.equals(SECOND_BOT_SERIAL_NUMBER)) {
             if (!Robot.consts.disableAllLogs()) {
                 Log.log("ROBOT/ROBOT_INFO/ROBOT TYPE", "SECOND_BOT");
@@ -43,7 +43,7 @@ public class SwerveConsts {
             if (!Robot.consts.disableAllLogs()) {
                 Log.log(
                         "ROBOT/ROBOT_INFO/ROBOT TYPE",
-                        "UNKNOWN: geminknight is: " + GEMINKNIGHT_SERIAL_NUMBER);
+                        "UNKNOWN: first bot serial is: " + FIRST_BOT_SERIAL_NUMBER);
             }
             return Robots.UNKNOWN;
         }
@@ -56,21 +56,21 @@ public class SwerveConsts {
                 Log.log("ROBOT/ROBOT_INFO/SWERVE CONSTS", "Using DemoBotConsts");
             }
             return new DemoBotConsts();
-        } else if (robot.equals(Robots.GEMINKNIGHT)) {
+        } else if (robot.equals(Robots.FIRST_BOT)) {
             if (!Robot.consts.disableAllLogs()) {
-                Log.log("ROBOT/ROBOT_INFO/SWERVE CONSTS", "Using GeminiConsts");
+                Log.log("ROBOT/ROBOT_INFO/SWERVE CONSTS", "Using FirstBotSwerveConsts");
             }
-            return new GeminiConsts();
+            return new FirstBotSwerveConsts();
         } else if (robot.equals(Robots.SECOND_BOT)) {
             if (!Robot.consts.disableAllLogs()) {
-                Log.log("ROBOT/ROBOT_INFO/SWERVE CONSTS", "Using SecondBotConsts");
+                Log.log("ROBOT/ROBOT_INFO/SWERVE CONSTS", "Using SecondBotSwerveConsts");
             }
-            return new DarkKnightConsts();
+            return new SecondBotSwerveConsts();
         } else {
             if (!Robot.consts.disableAllLogs()) {
-                Log.log("ROBOT/ROBOT_INFO/SWERVE CONSTS", "Using DemoBotConsts (default)");
+                Log.log("ROBOT/ROBOT_INFO/SWERVE CONSTS", "Using FirstBotSwerveConsts (default)");
             }
-            return new GeminiConsts();
+            return new FirstBotSwerveConsts();
         }
     }
 }

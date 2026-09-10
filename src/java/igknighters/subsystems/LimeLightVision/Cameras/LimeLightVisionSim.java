@@ -20,7 +20,7 @@ public class LimeLightVisionSim extends LimeLights {
         visionSimulators = new ArrayList<>();
         estimatedPoses = new ArrayList<>();
         cameraRotations = new ArrayList<>();
-        cameraRotations.add(new Double[] {60.0, 120.0}); // intake Cam
+        cameraRotations.add(new Double[] {60.0, 120.0}); // front cam
         cameraRotations.add(new Double[] {135.0, 195.0});
         cameraRotations.add(new Double[] {150.0, 210.0});
         cameraRotations.add(new Double[] {240.0, 300.0});

@@ -1,7 +1,6 @@
 package igknighters;
 
 import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.networktables.DoubleArrayPublisher;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableInstance;
@@ -14,6 +13,9 @@ import java.util.List;
  * FieldVisualizer provides methods to update specific objects on the field (Field2d) independently
  * of the main telemetry loop. This allows for updating vision targets, detected objects, and other
  * field elements only when necessary.
+ *
+ * <p>The robot base publishes only season independent overlays. Add publishers for game specific
+ * targets and mechanism poses in a season repository.
  */
 public class FieldVisualizer {
 
@@ -29,22 +31,14 @@ public class FieldVisualizer {
         return SingletonHelper.INSTANCE;
     }
 
-    private final TunableBoolean shouldShowBalls =
-            TunableValues.getBoolean("FieldVisualizer/ShowBalls", true);
-    private final TunableBoolean shouldShowShootingTarget =
-            TunableValues.getBoolean("FieldVisualizer/ShowShootingTarget", true);
+    private final TunableBoolean shouldShowDetectedObjects =
+            TunableValues.getBoolean("FieldVisualizer/ShowDetectedObjects", true);
     private final TunableBoolean shouldShowDrivingTarget =
             TunableValues.getBoolean("FieldVisualizer/ShowDrivingTarget", true);
 
     private final NetworkTableInstance inst = NetworkTableInstance.getDefault();
     private final NetworkTable table = inst.getTable("Pose");
     private final StringPublisher fieldTypePub = table.getStringTopic(".type").publish();
-
-    private final DoubleArrayPublisher shootingTargetPub =
-            table.getDoubleArrayTopic("shootingTargetPose").publish();
-
-    private final DoubleArrayPublisher turretAnglePub =
-            table.getDoubleArrayTopic("turretAngle").publish();
 
     private final DoubleArrayPublisher predictedFuturePose =
             table.getDoubleArrayTopic("futurePose").publish();
@@ -54,20 +48,6 @@ public class FieldVisualizer {
 
     private final DoubleArrayPublisher detectedObjectsPub =
             table.getDoubleArrayTopic("detectedObjects").publish();
-
-    /**
-     * Updates the shooting target pose on the field.
-     *
-     * @param target The pose of the shooting target, or null to clear.
-     */
-    public void updateShootingTarget(Pose2d target) {
-        if (target == null || !shouldShowShootingTarget.value()) {
-            shootingTargetPub.set(new double[0]);
-            return;
-        }
-        shootingTargetPub.set(
-                new double[] {target.getX(), target.getY(), target.getRotation().getDegrees()});
-    }
 
     public void updatePredictedPose(Pose2d pred_pose) {
         if (pred_pose == null) {
@@ -94,25 +74,13 @@ public class FieldVisualizer {
                 new double[] {target.getX(), target.getY(), target.getRotation().getDegrees()});
     }
 
-    public void updateTurret(double turretAngleDegrees, Pose2d robotPose) {
-        Pose2d newPose =
-                new Pose2d(
-                        robotPose.getX(),
-                        robotPose.getY(),
-                        robotPose
-                                .getRotation()
-                                .plus(new Rotation2d(Math.toRadians(turretAngleDegrees))));
-        turretAnglePub.set(
-                new double[] {newPose.getX(), newPose.getY(), newPose.getRotation().getDegrees()});
-    }
-
     /**
      * Updates the list of detected objects on the field.
      *
      * @param objects A list of poses for detected objects, or null/empty to clear.
      */
     public void updateDetectedObjects(List<Pose2d> objects) {
-        if (objects == null || objects.isEmpty() || !shouldShowBalls.value()) {
+        if (objects == null || objects.isEmpty() || !shouldShowDetectedObjects.value()) {
             detectedObjectsPub.set(new double[0]);
             return;
         }
@@ -130,13 +98,10 @@ public class FieldVisualizer {
      * Updates all vision-related targets on the field in one call.
      *
      * @param detectedObjects List of detected object poses.
-     * @param shootingTarget Shooting target pose.
      * @param drivingTarget Driving target pose.
      */
-    public void updateVisionTargets(
-            List<Pose2d> detectedObjects, Pose2d shootingTarget, Pose2d drivingTarget) {
+    public void updateVisionTargets(List<Pose2d> detectedObjects, Pose2d drivingTarget) {
         updateDetectedObjects(detectedObjects);
-        updateShootingTarget(shootingTarget);
         updateDrivingTarget(drivingTarget);
     }
 }

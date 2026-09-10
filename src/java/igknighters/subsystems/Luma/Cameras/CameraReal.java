@@ -14,6 +14,15 @@ import org.photonvision.targeting.PhotonPipelineResult;
 import org.photonvision.targeting.PhotonTrackedTarget;
 
 public class CameraReal extends Camera {
+
+    /**
+     * Height above the floor of the center of the tracked object, in meters.
+     *
+     * <p>For a spherical game piece this is its radius. Set this to match the object the detection
+     * pipeline is trained on each season.
+     */
+    public static final double TARGET_HEIGHT_METERS = 0.075;
+
     PhotonCamera camera;
     String name;
     double cameraHeightMeters;
@@ -85,7 +94,7 @@ public class CameraReal extends Camera {
         double distance =
                 PhotonUtils.calculateDistanceToTargetMeters(
                         cameraHeightMeters,
-                        0.075, // Target height is the radius of the fuel in meters
+                        TARGET_HEIGHT_METERS,
                         cameraPitchRadians,
                         Units.degreesToRadians(bestTarget.getPitch()));
 
@@ -204,7 +213,7 @@ public class CameraReal extends Camera {
                 double distance =
                         PhotonUtils.calculateDistanceToTargetMeters(
                                 cameraHeightMeters,
-                                0.075, // Target height is the radius of the fuel in meters
+                                TARGET_HEIGHT_METERS,
                                 cameraPitchRadians,
                                 Units.degreesToRadians(gamePiece.getPitch()));
 

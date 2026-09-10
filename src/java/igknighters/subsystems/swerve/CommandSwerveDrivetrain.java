@@ -25,7 +25,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.Subsystem;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
-import igknighters.subsystems.swerve.swerveconstants.knightshadeConsts.TunerSwerveDrivetrain;
+import igknighters.subsystems.swerve.swerveconstants.TunerSwerveDrivetrain;
 import java.util.function.Supplier;
 
 /** Class that extends the Phoenix 6 SwerveDrivetrain class. */

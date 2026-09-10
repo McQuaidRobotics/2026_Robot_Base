@@ -6,16 +6,9 @@ import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.GenericHID.RumbleType;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
-import igknighters.commands.HigherOrderCommands;
-import igknighters.commands.IndexerCommands;
-import igknighters.commands.IntakeCommands;
-import igknighters.commands.Shooter.AimingCommands;
-import igknighters.commands.Shooter.ShooterCommands;
 import igknighters.commands.SwerveCommands;
 import igknighters.commands.Wayfinder;
-import igknighters.constants.DrivingSharedState;
 import igknighters.subsystems.Subsystems;
-import igknighters.subsystems.intake.IntakeState;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 
@@ -26,8 +19,6 @@ public class DriverController {
     // Define the buttons on the controller
 
     private final CommandXboxController controller;
-
-    private boolean intakeActive = false;
 
     /** Button: 1 */
     protected final Trigger A;
@@ -100,47 +91,15 @@ public class DriverController {
     }
 
     public static enum DebugType {
-        SHOOTER,
-        SWERVE,
-        INTAKE,
-        INDEXER,
-        CLIMBER;
+        SWERVE;
     }
 
     public void bind(final Subsystems subsystems, DebugType debugType) {
-        DrivingSharedState state = DrivingSharedState.getInstance();
         var swerve = subsystems.swerve;
-        var shooter = subsystems.shooter;
-        var indexer = subsystems.indexer;
 
         if (debugType == DebugType.SWERVE) {
             this.X.whileTrue(Wayfinder.driveToTarget(swerve, new Pose2d(3, 1, new Rotation2d(0))));
-        } else if (debugType == DebugType.SHOOTER) {
-            this.A.whileTrue(ShooterCommands.targetState(shooter, 5000, 90, 25));
-            this.B.whileTrue(ShooterCommands.targetState(shooter, 5000, 180, 30));
-            this.X.whileTrue(ShooterCommands.targetState(shooter, 5000, 270, 35));
-            this.Y.whileTrue(ShooterCommands.targetState(shooter, 5000, 360, 40));
-            // this.RT.whileTrue(IndexerCommands.dispense(indexer));
-            // this.LT.whileTrue(IndexerCommands.stopDispensing(indexer));
-            this.RT.whileTrue(AimingCommands.shootWithProtection(subsystems.shooter));
-            this.LT.whileTrue(IndexerCommands.dispense(indexer));
-
-            // this.DPD.whileTrue(ShooterCommands.targetState(shooter, 0, 0,
-            // kHood.MAX_ANGLE_DEGREES));
-            // this.DPR.whileTrue(ShooterCommands.targetNetworkTablesValues(shooter));
-            // this.DPU.whileTrue(ShooterCommands.targetState(shooter, 0, 0,
-            // kHood.MIN_ANGLE_DEGREES));
-
-        } else if (debugType == DebugType.INDEXER) {
-            this.A.onTrue(IndexerCommands.dispense(indexer));
-            this.B.onTrue(IndexerCommands.justStop(indexer));
-        } else if (debugType == DebugType.INTAKE) {
-            this.A.whileTrue(IntakeCommands.holdAtIntake(subsystems.intake));
-            this.B.whileTrue(IntakeCommands.jorkIt(subsystems.intake));
-            this.X.whileTrue(IntakeCommands.slightJorkIntake(subsystems.intake));
-            this.Y.onTrue(IntakeCommands.toggleHoldState(subsystems.intake));
         } else {
-            System.out.println("UNKNOWN DEBUG TYPE: " + debugType);
             throw new IllegalArgumentException("UNKNOWN DEBUG TYPE: " + debugType);
         }
     }
@@ -149,21 +108,16 @@ public class DriverController {
         return () -> subsystems.swerve.getState().Pose;
     }
 
+    /**
+     * Binds the driver controls.
+     *
+     * <p>The robot base binds only drivetrain controls. Add game specific superstructure bindings
+     * in a season repository.
+     */
     public void bind(final Subsystems subsystems) {
         var swerve = subsystems.swerve;
-        var intake = subsystems.intake;
 
-        this.LT.whileTrue(IntakeCommands.holdAtIntake(subsystems.intake));
-        this.RT
-                .whileTrue(HigherOrderCommands.rapidFireStream(subsystems))
-                .onFalse(HigherOrderCommands.IdleShooter(subsystems));
-        this.DPR.whileTrue(IndexerCommands.unBlock(subsystems.indexer));
-        this.RB.whileTrue(HigherOrderCommands.forceDispense(subsystems));
-        this.LB.whileTrue(IntakeCommands.intakeWhileSlightJorking(intake));
         this.Start.onTrue(SwerveCommands.zeroGyro(swerve));
-        this.X.whileTrue(IntakeCommands.expell(subsystems.intake));
-        this.Y.onTrue(IntakeCommands.holdAtState(subsystems.intake, IntakeState.FULL_STOW));
-        this.DPD.whileTrue(ShooterCommands.homeHood(subsystems.shooter));
         this.A.and(this.B).whileTrue(Wayfinder.driveToSafeSpot(swerve));
     }
 

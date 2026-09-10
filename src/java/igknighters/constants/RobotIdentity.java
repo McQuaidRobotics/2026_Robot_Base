@@ -5,13 +5,13 @@ import edu.wpi.first.wpilibj.RobotController;
 public class RobotIdentity {
 
     public enum Robots {
-        GEMINKNIGHT,
+        FIRST_BOT,
         DEMO_BOT,
         SECOND_BOT,
         UNKNOWN
     }
 
-    private static final String GEMINKNIGHT_SERIAL_NUMBER = "032B4B20";
+    private static final String FIRST_BOT_SERIAL_NUMBER = "032B4B20";
     private static final String SECOND_BOT_SERIAL_NUMBER = "03260ABB"; // To be filled in later
 
     private static Robots robot = null;
@@ -19,21 +19,21 @@ public class RobotIdentity {
     public static Robots getRobot() {
         if (robot == null) {
             String serialNumber = RobotController.getSerialNumber();
-            if (serialNumber.equals(GEMINKNIGHT_SERIAL_NUMBER)) {
-                robot = Robots.GEMINKNIGHT;
+            if (serialNumber.equals(FIRST_BOT_SERIAL_NUMBER)) {
+                robot = Robots.FIRST_BOT;
             } else if (serialNumber.equals(SECOND_BOT_SERIAL_NUMBER)) {
                 robot = Robots.SECOND_BOT;
             } else if (serialNumber.equals("TBD")) { // Placeholder for Demo Bot if different
-                robot = Robots.GEMINKNIGHT;
+                robot = Robots.FIRST_BOT;
             } else {
-                robot = Robots.GEMINKNIGHT; // will default to GEMINIKNIGHT
+                robot = Robots.FIRST_BOT; // will default to FIRST_BOT
             }
         }
         return robot;
     }
 
-    public static boolean isGemini() {
-        return getRobot() == Robots.GEMINKNIGHT;
+    public static boolean isFirstBot() {
+        return getRobot() == Robots.FIRST_BOT;
     }
 
     public static boolean isSecondBot() {

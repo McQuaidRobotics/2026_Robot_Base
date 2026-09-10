@@ -15,13 +15,18 @@ import java.util.Map;
 
 public class AprilTagLayout {
 
+    /**
+     * Deploy relative path to the AprilTag field layout.
+     *
+     * <p>The field layout changes every season. Replace this file with the current game's layout
+     * (the WPILib or AndyMark published JSON) when starting a new season.
+     */
+    public static final String LAYOUT_PATH = "assets/apriltag_layout.json";
+
     private final Map<Integer, Pose3d> tagPoses = new HashMap<>();
 
     public AprilTagLayout() throws IOException {
-        File file =
-                new File(
-                        Filesystem.getDeployDirectory(),
-                        "assets/2026_Rebuilt_April_Tags_AndyMark.json");
+        File file = new File(Filesystem.getDeployDirectory(), LAYOUT_PATH);
         ObjectMapper mapper = new ObjectMapper();
         mapper.configure(
                 com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,

@@ -64,7 +64,11 @@ deploy {
                     jvmArgs.add("-Dcom.sun.management.jmxremote.local.only=false")
                     jvmArgs.add("-Dcom.sun.management.jmxremote.ssl=false")
                     jvmArgs.add("-Dcom.sun.management.jmxremote.authenticate=false")
-                    jvmArgs.add("-Djava.rmi.server.hostname=10.31.73.2")
+                    // Derive the roboRIO IP (10.TE.AM.2) from the team number so VisualVM's RMI
+                    // hostname follows the configured team instead of being pinned to 3173.
+                    def teamNum = project.frc.getTeamNumber()
+                    jvmArgs.add(
+                            "-Djava.rmi.server.hostname=10.${teamNum.intdiv(100)}.${teamNum % 100}.2")
                     }
 
                 // Static files artifact

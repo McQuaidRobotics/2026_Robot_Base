@@ -1,7 +1,5 @@
 package igknighters.subsystems.LimeLightVision;
 
-import java.util.ArrayList;
-
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Transform3d;
 
@@ -22,14 +20,19 @@ public class CameraData {
         // IDX 2: Object detection
         // IDX 3: Tag Tracking
 
-        // this would entail when configuring the limelights with our pipelines we put corresponding pipelines on the corresponding idxs
-        // So when you ask a camera to do pose detection it will use idx 1. The do everything is a little niche but i was thinking a single camera
-        // might be usefull doing different things at different times. I do not forsee switching rapidly to be a good idea however it could do something
+        // this would entail when configuring the limelights with our pipelines we put corresponding
+        // pipelines on the corresponding idxs
+        // So when you ask a camera to do pose detection it will use idx 1. The do everything is a
+        // little niche but i was thinking a single camera
+        // might be usefull doing different things at different times. I do not forsee switching
+        // rapidly to be a good idea however it could do something
         // different begining during and end differently. Kinda niche but i think it has use.
-        
+
     }
+
     /**
      * static camera parameters
+     *
      * @param name
      * @param cameraFloorRobotCenter
      * @param cameraPipeline
@@ -40,8 +43,10 @@ public class CameraData {
         this.cameraPipeline = cameraPipeline;
         this.cameraOffsetFromAxisOfRotation = null;
     }
+
     /**
      * moving camera parameters
+     *
      * @param name
      * @param cameraFloorRobotCenter
      * @param cameraOffsetFromRotation

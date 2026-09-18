@@ -35,6 +35,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Optional;
 import java.util.function.Supplier;
+import limelight.networktables.Orientation3d;
 import org.littletonrobotics.junction.LoggedRobot;
 import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.networktables.NT4Publisher;
@@ -58,7 +59,7 @@ public class Robot extends LoggedRobot {
     private final CommandScheduler scheduler = CommandScheduler.getInstance();
     public static RobotPosePredictor pose_pred;
     public static RobotPosePredError pose_pred_error = new RobotPosePredError();
-
+    public static Orientation3d robotOrientation;
     private final DriverController driverController = new DriverController(0);
 
     public final Subsystems subsystems;
@@ -228,6 +229,7 @@ public class Robot extends LoggedRobot {
     @Override
     public void robotPeriodic() {
         CommandScheduler.getInstance().run();
+        robotOrientation = subsystems.swerve.getRobotOrientation();
         pose_pred.setVelocitiesAndPose();
         pose_pred_error.logPose(subsystems.swerve.getState().Pose);
 

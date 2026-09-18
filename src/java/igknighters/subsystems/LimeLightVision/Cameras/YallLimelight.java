@@ -4,24 +4,40 @@ import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Translation3d;
+import edu.wpi.first.units.measure.Time;
 import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.RobotController;
+import igknighters.FieldVisualizer;
 import igknighters.Robot;
 import igknighters.subsystems.LimeLightVision.CameraData;
+import igknighters.subsystems.LimeLightVision.LimeLightVision;
 import igknighters.subsystems.LimeLightVision.CameraData.Pipelines;
+import igknighters.subsystems.LimeLightVision.LimeLightVision_OLD.object_output;
+import igknighters.subsystems.LimeLightVision.LimeLightVision_OLD.pose_output;
+import igknighters.subsystems.LimeLightVision.LimeLightVision_OLD.tag_output;
+
+import static edu.wpi.first.units.Units.Microseconds;
+import static edu.wpi.first.units.Units.Milliseconds;
+import static edu.wpi.first.units.Units.Seconds;
+
 import java.util.ArrayList;
 import java.util.Optional;
 import limelight.Limelight;
+import limelight.networktables.LimelightData;
 import limelight.networktables.LimelightPoseEstimator;
 import limelight.networktables.LimelightPoseEstimator.EstimationMode;
 import limelight.networktables.LimelightResults;
+import limelight.networktables.LimelightSettings.ImuMode;
 import limelight.networktables.LimelightSettings.LEDMode;
 import limelight.networktables.PoseEstimate;
 import limelight.networktables.target.pipeline.NeuralDetector;
 import limelight.results.RawFiducial;
+import limelight.sim.LimelightSim;
 
 public class YallLimelight {
     public CameraData data;
     public Limelight camera;
+    public LimelightSim sim_camera;
     public LimelightPoseEstimator poseEstimator;
     public boolean rotation_modified = false;
     public Pipelines functioning_as_pipeline;
@@ -29,10 +45,19 @@ public class YallLimelight {
     public YallLimelight(CameraData data) {
         this.data = data;
         camera = new Limelight(data.name);
+        sim_camera = new LimelightSim(camera);
+        sim_camera.withField2d(LimeLightVision.field_for_testing);
+        // WE NEED TO REFACTOR FIELD_VISUALIZER TO USE A FIELD 2d SO THAT WE CAN DO sim_camera.withField()
+        if (data.cameraFloorRobotCenter.equals(null)){
+            // the sim will assume its at the center of the robot and pointing forward in this state so carefull with sim. Better to have configs in code anyway
+            camera.getSettings()
+                .withLimelightLEDMode(LEDMode.PipelineControl).save();    
+        } else {
         camera.getSettings()
                 .withLimelightLEDMode(LEDMode.PipelineControl)
                 .withCameraOffset(data.cameraFloorRobotCenter)
                 .save();
+        }
         poseEstimator = camera.createPoseEstimator(EstimationMode.MEGATAG2);
 
         switch (data.cameraPipeline) {
@@ -63,13 +88,21 @@ public class YallLimelight {
         // at 4 m is 50% confident
     }
 
+    public void setThrottle(double throttle) {
+        camera.getSettings().withThrottle(throttle).save();
+    }
+
+    public void setIMUMode(ImuMode imuMode) {
+        camera.getSettings().withImuMode(imuMode);
+    }
+
     /**
      * This is the method for a singular static camera for pose finding if it is on a turret or
      * moving you must supply the angle of the turret in periodic.
      *
      * @return null if not valid and the pose reported by the camera if valid
      */
-    public Pose2d getRobotPoseFromVision() {
+    public pose_output getRobotPoseFromVision() {
         if (!(data.cameraPipeline.equals(Pipelines.DOES_EVERYTHING)
                 | data.cameraPipeline.equals(Pipelines.POSE_DETECTION))) {
             DriverStation.reportWarning(
@@ -102,7 +135,7 @@ public class YallLimelight {
                 if (validEstimate.avgTagDist < 4
                         && validEstimate.tagCount > 1
                         && validEstimate.getMinTagAmbiguity() < .3) {
-                    return validEstimate.pose.toPose2d();
+                    return new pose_output(validEstimate.pose.toPose2d(), Microseconds.of(RobotController.getFPGATime()));
                 } else {
                     // does not meet detection requirments
                     return null;
@@ -122,7 +155,7 @@ public class YallLimelight {
      *     tags 0 is allow everything 1 is deny everything
      * @return a translation 3d where x = tx y = ty and z = ta or null
      */
-    public Translation3d getTagTranslation(Integer tag_id, double pickyness) {
+    public tag_output getTagTranslation(Integer tag_id, double pickyness) {
         if (!(data.cameraPipeline.equals(Pipelines.DOES_EVERYTHING)
                 | data.cameraPipeline.equals(Pipelines.TAG_TRACKING))) {
             DriverStation.reportWarning(
@@ -134,22 +167,23 @@ public class YallLimelight {
             functioning_as_pipeline = Pipelines.TAG_TRACKING;
             camera.getSettings().withPipelineIndex(3).save();
         }
-
-        for (RawFiducial tag : camera.getData().getRawFiducials()) {
+        LimelightData data = camera.getData();
+        for (RawFiducial tag : data.getRawFiducials()) {
             // tag.id, tag.txnc, tag.tync, tag.ta
             // tag.distToCamera, tag.distToRobot (meters)
             // tag.ambiguity (0-1, lower is more trustworthy)
 
             if (tag.id == tag_id) {
                 if (calculateScore(tag.ambiguity, tag.distToCamera) >= pickyness) {
-                    return new Translation3d(tag.txnc, tag.tync, tag.ta);
+                    
+                    return new tag_output(new Translation3d(tag.txnc, tag.tync, tag.ta), Milliseconds.of(RobotController.getFPGATime()));
                 }
             }
         }
         return null;
     }
 
-    public ArrayList<Translation3d> getObjectTranslation(
+    public object_output getObjectTranslation(
             String objectName, double required_confidence) {
         if (!(data.cameraPipeline.equals(Pipelines.DOES_EVERYTHING)
                 | data.cameraPipeline.equals(Pipelines.OBJECT_DETECTION))) {
@@ -182,7 +216,7 @@ public class YallLimelight {
         if (outputs.isEmpty()) {
             return null;
         } else {
-            return outputs;
+            return new object_output(outputs, Microseconds.of(RobotController.getFPGATime()));
         }
     }
 
@@ -210,5 +244,9 @@ public class YallLimelight {
                         new Pose3d(
                                 data.cameraOffsetFromAxisOfRotation.getTranslation(), rotation3d))
                 .save();
+    }
+
+    public void simPeriodic(Pose2d robotPose) {
+        sim_camera.update(robotPose);
     }
 }

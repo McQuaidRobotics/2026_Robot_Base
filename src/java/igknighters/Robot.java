@@ -21,7 +21,7 @@ import igknighters.constants.RobotConsts;
 import igknighters.constants.RobotIdentity;
 import igknighters.constants.SecondBotConsts;
 import igknighters.controllers.DriverController;
-import igknighters.subsystems.LimeLightVision.LimeLightVision;
+import igknighters.subsystems.LimeLightVision.LimeLightVision_OLD;
 import igknighters.subsystems.Luma.Luma;
 import igknighters.subsystems.Subsystems;
 import igknighters.subsystems.led.Led;
@@ -212,7 +212,7 @@ public class Robot extends LoggedRobot {
         subsystems =
                 new Subsystems(
                         new Swerve(isSwerveDisabled),
-                        new LimeLightVision(),
+                        new LimeLightVision_OLD(),
                         new Led(90, 2),
                         new Luma(true, "object-detection"));
         setUpSwerve(subsystems);

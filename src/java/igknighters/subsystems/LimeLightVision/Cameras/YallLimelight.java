@@ -36,7 +36,8 @@ public class YallLimelight {
     public LimelightSim sim_camera;
     public LimelightPoseEstimator poseEstimator;
     public boolean rotation_modified = false;
-    public Pipelines functioning_as_pipeline;
+    public Pipelines functioning_as_pipeline =
+            Pipelines.POSE_DETECTION; // DEFAULT TO POSE DETECTION
 
     public YallLimelight(CameraData data) {
         this.data = data;
@@ -90,7 +91,7 @@ public class YallLimelight {
     }
 
     public void setIMUMode(ImuMode imuMode) {
-        camera.getSettings().withImuMode(imuMode);
+        camera.getSettings().withImuMode(imuMode).save();
     }
 
     /**
@@ -101,7 +102,7 @@ public class YallLimelight {
      */
     public pose_output getRobotPoseFromVision() {
         if (!(data.cameraPipeline.equals(Pipelines.DOES_EVERYTHING)
-                | data.cameraPipeline.equals(Pipelines.POSE_DETECTION))) {
+                || data.cameraPipeline.equals(Pipelines.POSE_DETECTION))) {
             DriverStation.reportWarning(
                     "YOU ARE ASKING FOR A POSE FROM A NON POSE DESIGNED CAMERA", null);
             return null;
@@ -156,14 +157,14 @@ public class YallLimelight {
      */
     public tag_output getTagTranslation(Integer tag_id, double pickyness) {
         if (!(data.cameraPipeline.equals(Pipelines.DOES_EVERYTHING)
-                | data.cameraPipeline.equals(Pipelines.TAG_TRACKING))) {
+                || data.cameraPipeline.equals(Pipelines.TAG_TRACKING))) {
             DriverStation.reportWarning(
                     "YOU ARE ASKING FOR A TAG INFO FROM A NON TAG DESIGNED CAMERA", null);
             return null;
         }
         if (data.cameraPipeline.equals(Pipelines.DOES_EVERYTHING)
-                && !functioning_as_pipeline.equals(Pipelines.TAG_TRACKING)) {
-            functioning_as_pipeline = Pipelines.TAG_TRACKING;
+                && !functioning_as_pipeline.equals(Pipelines.OBJECT_DETECTION)) {
+            functioning_as_pipeline = Pipelines.OBJECT_DETECTION;
             camera.getSettings().withPipelineIndex(3).save();
         }
         LimelightData data = camera.getData();
@@ -186,7 +187,7 @@ public class YallLimelight {
 
     public object_output getObjectTranslation(String objectName, double required_confidence) {
         if (!(data.cameraPipeline.equals(Pipelines.DOES_EVERYTHING)
-                | data.cameraPipeline.equals(Pipelines.OBJECT_DETECTION))) {
+                || data.cameraPipeline.equals(Pipelines.OBJECT_DETECTION))) {
             DriverStation.reportWarning(
                     "YOU ARE ASKING FOR A TAG INFO FROM A NON TAG DESIGNED CAMERA", null);
             return null;

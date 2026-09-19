@@ -89,13 +89,7 @@ public class LimeLightVision extends SubsystemBase {
         return RobotController.getFPGATime() / 1e6 - latestMeasurementTime.in(Seconds);
     }
 
-    public List<pose_output> getRobotPoseFromVision(
-            double yaw,
-            double yawRate,
-            double pitch,
-            double pitchRate,
-            double roll,
-            double rollRate) {
+    public List<pose_output> getRobotPoseFromVision() {
         if (!Robot.consts.limelightVision().disableVisionLogs()) {
             Log.log("ROBOT/Subsystems/Vison/Limelight/ENABLED", true);
         }
@@ -113,7 +107,9 @@ public class LimeLightVision extends SubsystemBase {
                 outputs.add(output);
             }
         }
-        latestMeasurementTime = max;
+        if (latestMeasurementTime.in(Seconds) < max.in(Seconds)) {
+            latestMeasurementTime = max;
+        }
         return outputs;
     }
 

@@ -11,7 +11,6 @@ import choreo.auto.AutoChooser;
 import choreo.auto.AutoFactory;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation3d;
-import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -244,11 +243,7 @@ public class Robot extends LoggedRobot {
         pose_pred_error.logPose(subsystems.swerve.getState().Pose);
 
         if (kUseLimelight) {
-            var driveState = subsystems.swerve.getState();
-            double headingDeg = driveState.Pose.getRotation().getDegrees();
-            double omegaRps = Units.radiansToRotations(driveState.Speeds.omegaRadiansPerSecond);
-            List<pose_output> vision_outputs =
-                    subsystems.vision.getRobotPoseFromVision(headingDeg, omegaRps, 0, 0, 0, 0);
+            List<pose_output> vision_outputs = subsystems.vision.getRobotPoseFromVision();
 
             if (vision_outputs != null) {
                 for (pose_output output : vision_outputs)

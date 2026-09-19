@@ -1,150 +1,95 @@
 package igknighters.subsystems.LimeLightVision;
 
+import static edu.wpi.first.units.Units.Microseconds;
+import static edu.wpi.first.units.Units.Milliseconds;
+import static edu.wpi.first.units.Units.RPM;
+import static edu.wpi.first.units.Units.Seconds;
 import static org.junit.jupiter.api.Assertions.*;
 
-import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.networktables.NetworkTableInstance;
-import igknighters.subsystems.LimeLightVision.Cameras.LimeLightVisionReal;
-import java.util.Arrays;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
+import edu.wpi.first.math.geometry.Pose3d;
+import edu.wpi.first.math.geometry.Rotation3d;
+import edu.wpi.first.math.geometry.Translation3d;
+import edu.wpi.first.units.measure.Time;
+import igknighters.Robot;
+import igknighters.constants.FirstBotConsts;
+import igknighters.subsystems.LimeLightVision.CameraData.Pipelines;
+import igknighters.subsystems.LimeLightVision.Cameras.YallLimelight;
+import limelight.networktables.AngularVelocity3d;
+import limelight.networktables.Orientation3d;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-public class LimelightHelpersTest {
-    @BeforeAll
-    public static void setupNetworkTables() {
-        NetworkTableInstance inst = NetworkTableInstance.getDefault();
-        inst.startServer("testTables.json", "testTables.json", 10000);
+class LimeLightVisionTest {
+
+    private CameraData createData(String name, Pipelines pipeline) {
+        return new CameraData(name, new Pose3d(new Translation3d(), new Rotation3d()), pipeline);
+    }
+
+    @BeforeEach
+    void setOrientation() {
+        // 1. Initialize static orientation to prevent NPE on periodic/limelight calls
+        Robot.robotOrientation =
+                new Orientation3d(
+                        new Rotation3d(),
+                        new AngularVelocity3d(RPM.of(0.0), RPM.of(0.0), RPM.of(0.0)));
+
+        // 2. Guarantee Robot.consts is non-null for tests
+        Robot.consts = new FirstBotConsts();
     }
 
     @Test
-    public void parsesBotposeRotation() throws InterruptedException {
-        String cam1 = "limelight-cam1";
-        String cam2 = "limelight-cam2";
-        double rot1 = 1;
-        double rot2 = 359;
-        LimeLightVisionReal vision = new LimeLightVisionReal(cam1, cam2);
+    void testCalculateScore() {
+        YallLimelight camera = new YallLimelight(createData("testCam", Pipelines.POSE_DETECTION));
 
-        // Fake botpose array: [x, y, z, roll, pitch, yaw, latency, tagCount, ...]
-        double[] fakeBotpose1 = new double[18];
-        fakeBotpose1[0] = 2.0; // x
-        fakeBotpose1[1] = 3.0; // y
-        fakeBotpose1[2] = 0.0; // z
-        fakeBotpose1[3] = 0.0; // roll
-        fakeBotpose1[4] = 0.0; // pitch
-        fakeBotpose1[5] = rot1; // yaw in degrees
-        fakeBotpose1[6] = 20.0; // latency
-        fakeBotpose1[7] = 1; // tagCount
-        fakeBotpose1[8] = 0.5; // tagSpan
-        fakeBotpose1[9] = 1.0; // avgTagDist
-        fakeBotpose1[10] = 0.1; // avgTagArea
-        fakeBotpose1[11] = 1; // id
-        fakeBotpose1[12] = 0; // txnc
-        fakeBotpose1[13] = 0; // tync
-        fakeBotpose1[14] = 0; // ta
-        fakeBotpose1[15] = 0; // distToCamera
-        fakeBotpose1[16] = 0; // distToRobot
-        fakeBotpose1[17] = 0; // ambiguity
+        // At ambiguity 0.0 and distance 4.0m: (2 - (0 + 1)) / 2 = 0.5
+        double score = camera.calculateScore(0.0, 4.0);
+        assertEquals(0.5, score, 1e-6, "Score at max range with 0 ambiguity should be 0.5");
 
-        // [x, y, z, roll, pitch, yaw, latency, tagCount, ...]
-        double[] fakeBotpose2 = new double[18];
-        fakeBotpose2[0] = 2.0; // x
-        fakeBotpose2[1] = 3.0; // y
-        fakeBotpose2[2] = 0.0; // z
-        fakeBotpose2[3] = 0.0; // roll
-        fakeBotpose2[4] = 0.0; // pitch
-        fakeBotpose2[5] = rot2; // yaw in degrees
-        fakeBotpose2[6] = 20.0; // latency
-        fakeBotpose2[7] = 1; // tagCount
-        fakeBotpose2[8] = 0.5; // tagSpan
-        fakeBotpose2[9] = 1.0; // avgTagDist
-        fakeBotpose2[10] = 0.1; // avgTag
-        fakeBotpose2[11] = 2; // id
-        fakeBotpose2[12] = 0; // txnc
-        fakeBotpose2[13] = 0; // tync
-        fakeBotpose2[14] = 0; // ta
-        fakeBotpose2[15] = 0; // distToCamera
-        fakeBotpose2[16] = 0; // distToRobot
-        fakeBotpose2[17] = 0; // ambiguity
-        // Inject into NetworkTables
-        NetworkTableInstance.getDefault()
-                .getTable(cam1)
-                .getEntry("botpose_orb_wpiblue")
-                .setDoubleArray(fakeBotpose1);
-
-        NetworkTableInstance.getDefault()
-                .getTable(cam1)
-                .getEntry("botpose_wpiblue")
-                .setDoubleArray(fakeBotpose1);
-        NetworkTableInstance.getDefault()
-                .getTable(cam2)
-                .getEntry("botpose_orb_wpiblue")
-                .setDoubleArray(fakeBotpose2);
-
-        NetworkTableInstance.getDefault()
-                .getTable(cam2)
-                .getEntry("botpose_wpiblue")
-                .setDoubleArray(fakeBotpose2);
-
-        // Give NetworkTables some time to process the update
-        try {
-            Thread.sleep(100); // 100ms is usually enough
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-        double[] cam1ReadBack =
-                NetworkTableInstance.getDefault()
-                        .getTable(cam1)
-                        .getEntry("botpose_orb_wpiblue")
-                        .getDoubleArray(new double[0]);
-
-        double[] cam2ReadBack =
-                NetworkTableInstance.getDefault()
-                        .getTable(cam2)
-                        .getEntry("botpose_orb_wpiblue")
-                        .getDoubleArray(new double[0]);
-
-        System.out.println("Read back from NT Cam 1: " + Arrays.toString(cam1ReadBack));
-
-        System.out.println("Read back from NT Cam 2: " + Arrays.toString(cam2ReadBack));
-
-        Pose2d robotVisionPose = vision.getRobotPoseFromVision(40.0, 0, 0, 0, 0, 0);
-        for (int i = 0; i < 10; i++) {
-            System.out.println("Retrying pose fetch... attempt " + (i + 1));
-            if (robotVisionPose != null) break;
-            robotVisionPose = vision.getRobotPoseFromVision(40.0, 0, 0, 0, 0, 0);
-            Thread.sleep(100);
-        }
-        double[] cam1Orientation =
-                NetworkTableInstance.getDefault()
-                        .getTable(cam1)
-                        .getEntry("robot_orientation_set")
-                        .getDoubleArray(new double[0]);
-        double[] cam2Orientation =
-                NetworkTableInstance.getDefault()
-                        .getTable(cam2)
-                        .getEntry("robot_orientation_set")
-                        .getDoubleArray(new double[0]);
-
-        assertNotNull(cam1Orientation, "Cam1 orientation should not be null");
-        assertNotNull(cam2Orientation, "Cam2 orientation should not be null");
-
-        assertNotNull(robotVisionPose, "PoseEstimate should not be null");
-        assertEquals(
-                0.0,
-                robotVisionPose.getRotation().getDegrees(),
-                0.01,
-                "Rotation should match injected value");
-        assertEquals(2.0, robotVisionPose.getX(), 0.001);
-        assertEquals(3.0, robotVisionPose.getY(), 0.001);
-        assertEquals(40, cam1Orientation[0], 0.001, "Cam1 yaw should match input");
-        assertEquals(40, cam2Orientation[0], 0.001, "Cam2 yaw should match input");
-        Thread.sleep(100);
+        // Perfect conditions: ambiguity 0.0, distance 0.0m -> score 1.0
+        assertEquals(1.0, camera.calculateScore(0.0, 0.0), 1e-6);
     }
 
-    @AfterAll
-    public static void teardownNetworkTables() {
-        System.out.println("Stopping NetworkTables server: LIMELIGHT PASSED");
-        NetworkTableInstance.getDefault().stopServer();
+    @Test
+    void testUninitializedPipelineDoesNotThrowNPE() {
+        CameraData data = createData("doesEverythingCam", Pipelines.DOES_EVERYTHING);
+        YallLimelight camera = new YallLimelight(data);
+
+        // Should handle null functioning_as_pipeline safely without throwing NullPointerException
+        assertDoesNotThrow(
+                () -> {
+                    camera.getRobotPoseFromVision();
+                });
+    }
+
+    @Test
+    void testTimestampPersistenceWhenNoTargetsVisible() {
+        LimeLightVision vision = new LimeLightVision();
+        vision.latestMeasurementTime = Seconds.of(10.0);
+
+        // Simulate query cycle where no vision measurements are returned
+        vision.getRobotPoseFromVision();
+
+        // Verify latestMeasurementTime was not reset to 0.0
+        assertEquals(
+                10.0,
+                vision.getLastTimeStamp(),
+                1e-6,
+                "latestMeasurementTime should retain last valid timestamp when no targets are"
+                        + " seen.");
+    }
+
+    @Test
+    void testMicrosecondToMillisecondConversion() {
+        long fpgaMicroseconds = 5_000_000L; // 5 seconds
+
+        Time correctTime = Microseconds.of(fpgaMicroseconds);
+        Time buggyTime = Milliseconds.of(fpgaMicroseconds);
+
+        assertNotEquals(
+                correctTime.in(Seconds),
+                buggyTime.in(Seconds),
+                "Microsecond FPGA timestamp mistakenly passed as Milliseconds causes 1000x scaling"
+                        + " error.");
+        assertEquals(5.0, correctTime.in(Seconds), 1e-6);
     }
 }

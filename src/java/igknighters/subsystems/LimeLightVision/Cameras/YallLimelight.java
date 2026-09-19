@@ -45,7 +45,7 @@ public class YallLimelight {
         sim_camera.withField2d(LimeLightVision.field_for_testing);
         // WE NEED TO REFACTOR FIELD_VISUALIZER TO USE A FIELD 2d SO THAT WE CAN DO
         // sim_camera.withField()
-        if (data.cameraFloorRobotCenter.equals(null)) {
+        if (data.cameraFloorRobotCenter == null) {
             // the sim will assume its at the center of the robot and pointing forward in this state
             // so carefull with sim. Better to have configs in code anyway
             camera.getSettings().withLimelightLEDMode(LEDMode.PipelineControl).save();
@@ -113,7 +113,7 @@ public class YallLimelight {
         }
         // non zero offset but you havent told anything its rotation so things will be wrong. Which
         // is why you need to tell it the rotation
-        if (!data.cameraOffsetFromAxisOfRotation.equals(null) && rotation_modified == false) {
+        if (!(data.cameraOffsetFromAxisOfRotation == null) && rotation_modified == false) {
             DriverStation.reportWarning(
                     "YOU ARE NOT SUPLYING A ROTATION TO A ROTATING CAMERA THIS WILL MESS UP VISION"
                             + " MEAUREMENTS",

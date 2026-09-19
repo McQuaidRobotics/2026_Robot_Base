@@ -1,25 +1,21 @@
 package igknighters.subsystems.LimeLightVision.Cameras;
 
+import static edu.wpi.first.units.Units.Microseconds;
+import static edu.wpi.first.units.Units.Milliseconds;
+
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Translation3d;
-import edu.wpi.first.units.measure.Time;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.RobotController;
-import igknighters.FieldVisualizer;
 import igknighters.Robot;
 import igknighters.subsystems.LimeLightVision.CameraData;
-import igknighters.subsystems.LimeLightVision.LimeLightVision;
 import igknighters.subsystems.LimeLightVision.CameraData.Pipelines;
-import igknighters.subsystems.LimeLightVision.LimeLightVision_OLD.object_output;
-import igknighters.subsystems.LimeLightVision.LimeLightVision_OLD.pose_output;
-import igknighters.subsystems.LimeLightVision.LimeLightVision_OLD.tag_output;
-
-import static edu.wpi.first.units.Units.Microseconds;
-import static edu.wpi.first.units.Units.Milliseconds;
-import static edu.wpi.first.units.Units.Seconds;
-
+import igknighters.subsystems.LimeLightVision.LimeLightVision;
+import igknighters.subsystems.LimeLightVision.LimeLightVision.object_output;
+import igknighters.subsystems.LimeLightVision.LimeLightVision.pose_output;
+import igknighters.subsystems.LimeLightVision.LimeLightVision.tag_output;
 import java.util.ArrayList;
 import java.util.Optional;
 import limelight.Limelight;
@@ -47,16 +43,17 @@ public class YallLimelight {
         camera = new Limelight(data.name);
         sim_camera = new LimelightSim(camera);
         sim_camera.withField2d(LimeLightVision.field_for_testing);
-        // WE NEED TO REFACTOR FIELD_VISUALIZER TO USE A FIELD 2d SO THAT WE CAN DO sim_camera.withField()
-        if (data.cameraFloorRobotCenter.equals(null)){
-            // the sim will assume its at the center of the robot and pointing forward in this state so carefull with sim. Better to have configs in code anyway
-            camera.getSettings()
-                .withLimelightLEDMode(LEDMode.PipelineControl).save();    
+        // WE NEED TO REFACTOR FIELD_VISUALIZER TO USE A FIELD 2d SO THAT WE CAN DO
+        // sim_camera.withField()
+        if (data.cameraFloorRobotCenter.equals(null)) {
+            // the sim will assume its at the center of the robot and pointing forward in this state
+            // so carefull with sim. Better to have configs in code anyway
+            camera.getSettings().withLimelightLEDMode(LEDMode.PipelineControl).save();
         } else {
-        camera.getSettings()
-                .withLimelightLEDMode(LEDMode.PipelineControl)
-                .withCameraOffset(data.cameraFloorRobotCenter)
-                .save();
+            camera.getSettings()
+                    .withLimelightLEDMode(LEDMode.PipelineControl)
+                    .withCameraOffset(data.cameraFloorRobotCenter)
+                    .save();
         }
         poseEstimator = camera.createPoseEstimator(EstimationMode.MEGATAG2);
 
@@ -135,7 +132,9 @@ public class YallLimelight {
                 if (validEstimate.avgTagDist < 4
                         && validEstimate.tagCount > 1
                         && validEstimate.getMinTagAmbiguity() < .3) {
-                    return new pose_output(validEstimate.pose.toPose2d(), Microseconds.of(RobotController.getFPGATime()));
+                    return new pose_output(
+                            validEstimate.pose.toPose2d(),
+                            Microseconds.of(RobotController.getFPGATime()));
                 } else {
                     // does not meet detection requirments
                     return null;
@@ -175,16 +174,17 @@ public class YallLimelight {
 
             if (tag.id == tag_id) {
                 if (calculateScore(tag.ambiguity, tag.distToCamera) >= pickyness) {
-                    
-                    return new tag_output(new Translation3d(tag.txnc, tag.tync, tag.ta), Milliseconds.of(RobotController.getFPGATime()));
+
+                    return new tag_output(
+                            new Translation3d(tag.txnc, tag.tync, tag.ta),
+                            Milliseconds.of(RobotController.getFPGATime()));
                 }
             }
         }
         return null;
     }
 
-    public object_output getObjectTranslation(
-            String objectName, double required_confidence) {
+    public object_output getObjectTranslation(String objectName, double required_confidence) {
         if (!(data.cameraPipeline.equals(Pipelines.DOES_EVERYTHING)
                 | data.cameraPipeline.equals(Pipelines.OBJECT_DETECTION))) {
             DriverStation.reportWarning(

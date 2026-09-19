@@ -9,6 +9,7 @@ import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.units.measure.Time;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import igknighters.Robot;
 import igknighters.constants.SubsystemConstants.kLimelightVision;
@@ -33,6 +34,8 @@ public class LimeLightVision extends SubsystemBase {
     public Time latestMeasurementTime = Seconds.of(0.0);
 
     public LimeLightVision() {
+
+        SmartDashboard.putData("LIMELIGHT_RAY_CAST", field_for_testing);
         cameras.add(
                 new YallLimelight(
                         new CameraData(
@@ -101,7 +104,7 @@ public class LimeLightVision extends SubsystemBase {
         for (YallLimelight camera : cameras) {
             if (camera.data.cameraPipeline.equals(Pipelines.POSE_DETECTION)) {
                 pose_output output = camera.getRobotPoseFromVision();
-                if (output.equals(null)) {
+                if (output == null) {
                     continue;
                 }
                 if (output.time.minus(max).in(Seconds) >= 0.0) {

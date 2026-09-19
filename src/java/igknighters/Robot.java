@@ -4,9 +4,13 @@
 
 package igknighters;
 
+import static edu.wpi.first.units.Units.RPM;
+import static edu.wpi.first.units.Units.Seconds;
+
 import choreo.auto.AutoChooser;
 import choreo.auto.AutoFactory;
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
@@ -21,7 +25,8 @@ import igknighters.constants.RobotConsts;
 import igknighters.constants.RobotIdentity;
 import igknighters.constants.SecondBotConsts;
 import igknighters.controllers.DriverController;
-import igknighters.subsystems.LimeLightVision.LimeLightVision_OLD;
+import igknighters.subsystems.LimeLightVision.LimeLightVision;
+import igknighters.subsystems.LimeLightVision.LimeLightVision.pose_output;
 import igknighters.subsystems.Luma.Luma;
 import igknighters.subsystems.Subsystems;
 import igknighters.subsystems.led.Led;
@@ -33,8 +38,11 @@ import igknighters.util.TunableValues.TunableDouble;
 import igknighters.util.log.Log;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
+import limelight.networktables.AngularVelocity3d;
+import limelight.networktables.LimelightSettings.ImuMode;
 import limelight.networktables.Orientation3d;
 import org.littletonrobotics.junction.LoggedRobot;
 import org.littletonrobotics.junction.Logger;
@@ -59,7 +67,9 @@ public class Robot extends LoggedRobot {
     private final CommandScheduler scheduler = CommandScheduler.getInstance();
     public static RobotPosePredictor pose_pred;
     public static RobotPosePredError pose_pred_error = new RobotPosePredError();
-    public static Orientation3d robotOrientation;
+    public static Orientation3d robotOrientation =
+            new Orientation3d(
+                    new Rotation3d(), new AngularVelocity3d(RPM.of(0), RPM.of(0), RPM.of(0)));
     private final DriverController driverController = new DriverController(0);
 
     public final Subsystems subsystems;
@@ -212,7 +222,7 @@ public class Robot extends LoggedRobot {
         subsystems =
                 new Subsystems(
                         new Swerve(isSwerveDisabled),
-                        new LimeLightVision_OLD(),
+                        new LimeLightVision(),
                         new Led(90, 2),
                         new Luma(true, "object-detection"));
         setUpSwerve(subsystems);
@@ -237,14 +247,14 @@ public class Robot extends LoggedRobot {
             var driveState = subsystems.swerve.getState();
             double headingDeg = driveState.Pose.getRotation().getDegrees();
             double omegaRps = Units.radiansToRotations(driveState.Speeds.omegaRadiansPerSecond);
-            Pose2d currentPose =
+            List<pose_output> vision_outputs =
                     subsystems.vision.getRobotPoseFromVision(headingDeg, omegaRps, 0, 0, 0, 0);
 
-            if (currentPose != null) {
-                subsystems.swerve.addVisionMeasurement(
-                        currentPose,
-                        subsystems.vision
-                                .getLastTimeStamp()); // trusts vision rotation less. Needs tuning
+            if (vision_outputs != null) {
+                for (pose_output output : vision_outputs)
+                    subsystems.swerve.addVisionMeasurement(
+                            output.pose(),
+                            output.time().in(Seconds)); // trusts vision rotation less. Needs tuning
                 // increase the std devs to trust vision less
                 if (!Robot.consts.limelightVision().disableVisionLogs()) {
                     Log.log("ROBOT/Subsystems/Vision/Null Pose", false);
@@ -281,12 +291,12 @@ public class Robot extends LoggedRobot {
 
     @Override
     public void disabledExit() {
-        subsystems.vision.enableCameras(0);
+        subsystems.vision.enableCameras(ImuMode.ExternalImu);
     }
 
     @Override
     public void autonomousInit() {
-        subsystems.vision.enableCameras(0);
+        subsystems.vision.enableCameras(ImuMode.ExternalImu);
         Command autoCommand = autoChooser.selectedCommand();
         m_autonomousCommand = autoCommand;
         if (autoCommand != null) {
@@ -305,7 +315,7 @@ public class Robot extends LoggedRobot {
 
     @Override
     public void teleopInit() {
-        subsystems.vision.enableCameras(0);
+        subsystems.vision.enableCameras(ImuMode.ExternalImu);
         subsystems.swerve.clearActiveTrajectory();
         scheduler.cancelAll();
         if (m_autonomousCommand != null) {

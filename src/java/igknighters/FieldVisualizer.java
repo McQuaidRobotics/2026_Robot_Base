@@ -5,7 +5,6 @@ import edu.wpi.first.networktables.DoubleArrayPublisher;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.networktables.StringPublisher;
-import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import igknighters.util.TunableValues;
 import igknighters.util.TunableValues.TunableBoolean;
 import java.util.List;

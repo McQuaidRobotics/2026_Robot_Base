@@ -1,13 +1,18 @@
 package igknighters.subsystems.LimeLightVision;
 
+import java.util.function.Supplier;
+
 import edu.wpi.first.math.geometry.Pose3d;
+import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Transform3d;
+import limelight.networktables.Orientation3d;
 
 public class CameraData {
     public Pose3d cameraFloorRobotCenter;
     public Transform3d cameraOffsetFromAxisOfRotation;
     public Pipelines cameraPipeline;
     public String name;
+    public Supplier<Rotation3d> orientationSupplier;
 
     public enum Pipelines {
         OBJECT_DETECTION, // output coords of game piece in field map
@@ -56,10 +61,12 @@ public class CameraData {
             String name,
             Pose3d cameraFloorRobotCenter,
             Transform3d cameraOffsetFromRotation,
+            Supplier<Rotation3d> orientationSupplier,
             Pipelines cameraPipeline) {
         this.name = name;
         this.cameraFloorRobotCenter = cameraFloorRobotCenter;
         this.cameraPipeline = cameraPipeline;
         this.cameraOffsetFromAxisOfRotation = cameraOffsetFromRotation;
+        this.orientationSupplier = orientationSupplier;
     }
 }

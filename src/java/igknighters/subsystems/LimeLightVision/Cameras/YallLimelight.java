@@ -5,7 +5,6 @@ import static edu.wpi.first.units.Units.Milliseconds;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
-import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.RobotController;
@@ -79,8 +78,6 @@ public class YallLimelight {
                 break;
         }
     }
-
-    
 
     public double calculateScore(double ambiguity, double distanceToRobot) {
         return (2 - (ambiguity + (distanceToRobot / 4.0)))
@@ -223,19 +220,18 @@ public class YallLimelight {
         }
     }
 
-    /**
-     * Must be called every cycle by the manager
-     */
+    /** Must be called every cycle by the manager */
     public void periodic() {
         // Must be called every cycle by the manager
         if (data.orientationSupplier != null && data.cameraOffsetFromAxisOfRotation != null) {
             rotation_modified = true;
             camera.getSettings()
-                .withRobotOrientation(Robot.robotOrientation)
-                .withCameraOffset(
-                        new Pose3d(
-                                data.cameraOffsetFromAxisOfRotation.getTranslation(), data.orientationSupplier.get()))
-                .save();
+                    .withRobotOrientation(Robot.robotOrientation)
+                    .withCameraOffset(
+                            new Pose3d(
+                                    data.cameraOffsetFromAxisOfRotation.getTranslation(),
+                                    data.orientationSupplier.get()))
+                    .save();
         } else {
             camera.getSettings().withRobotOrientation(Robot.robotOrientation).save();
         }

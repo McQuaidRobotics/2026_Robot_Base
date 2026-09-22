@@ -80,6 +80,8 @@ public class YallLimelight {
         }
     }
 
+    
+
     public double calculateScore(double ambiguity, double distanceToRobot) {
         return (2 - (ambiguity + (distanceToRobot / 4.0)))
                 / 2.0; // 4 is the max range im allowing for a comfortable detection so 0 ambiguity
@@ -222,29 +224,21 @@ public class YallLimelight {
     }
 
     /**
-     * MUST BE CALLED EVERY CYCLE FOR STATIC LLS DO NOT CALL PERIODIC two times. This will update
-     * the LL orientation.
+     * Must be called every cycle by the manager
      */
     public void periodic() {
         // Must be called every cycle by the manager
-        camera.getSettings().withRobotOrientation(Robot.robotOrientation).save();
-    }
-
-    /**
-     * THIS IS FOR ROTATIONAL ONLY DO NOT CALL ON LLS THAT DO NOT MOVE RELATIVE TO ROBOT
-     *
-     * @param rotation3d ROTATION RELATIVE TO ROBOT
-     */
-    public void periodic(Rotation3d rotation3d) {
-        // Must be called every cycle by manager
-        rotation_modified = true;
-
-        camera.getSettings()
+        if (data.orientationSupplier != null && data.cameraOffsetFromAxisOfRotation != null) {
+            rotation_modified = true;
+            camera.getSettings()
                 .withRobotOrientation(Robot.robotOrientation)
                 .withCameraOffset(
                         new Pose3d(
-                                data.cameraOffsetFromAxisOfRotation.getTranslation(), rotation3d))
+                                data.cameraOffsetFromAxisOfRotation.getTranslation(), data.orientationSupplier.get()))
                 .save();
+        } else {
+            camera.getSettings().withRobotOrientation(Robot.robotOrientation).save();
+        }
     }
 
     public void simPeriodic(Pose2d robotPose) {

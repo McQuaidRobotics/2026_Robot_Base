@@ -177,7 +177,7 @@ public class YallLimelight {
 
                     return new tag_output(
                             new Translation3d(tag.txnc, tag.tync, tag.ta),
-                            Milliseconds.of(RobotController.getFPGATime()));
+                            Microseconds.of(RobotController.getFPGATime()));
                 }
             }
         }

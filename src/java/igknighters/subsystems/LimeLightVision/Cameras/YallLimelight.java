@@ -2,16 +2,17 @@ package igknighters.subsystems.LimeLightVision.Cameras;
 
 import static edu.wpi.first.units.Units.Microseconds;
 import static edu.wpi.first.units.Units.Milliseconds;
+import static edu.wpi.first.units.Units.Seconds;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Translation3d;
+import edu.wpi.first.units.measure.Time;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.RobotController;
 import igknighters.Robot;
 import igknighters.subsystems.LimeLightVision.CameraData;
 import igknighters.subsystems.LimeLightVision.CameraData.Pipelines;
-import igknighters.subsystems.LimeLightVision.LimeLightVision;
 import igknighters.subsystems.LimeLightVision.LimeLightVision.object_output;
 import igknighters.subsystems.LimeLightVision.LimeLightVision.pose_output;
 import igknighters.subsystems.LimeLightVision.LimeLightVision.tag_output;
@@ -35,19 +36,20 @@ public class YallLimelight {
     public LimelightSim sim_camera;
     public LimelightPoseEstimator poseEstimator;
     public boolean rotation_modified = false;
-    public Pipelines functioning_as_pipeline =
-            Pipelines.POSE_DETECTION; // DEFAULT TO POSE DETECTION
+    public Pipelines functioning_as_pipeline = Pipelines.POSE_DETECTION;
+
+    public final ArrayList<Integer> visible_tag_ids = new ArrayList<>();
+
+    // Offset: (RIO FPGA Time) - (Limelight Hardware Time)
+    public Time time_offset = Seconds.of(0);
+    public boolean is_first_reading = true;
 
     public YallLimelight(CameraData data) {
         this.data = data;
         camera = new Limelight(data.name);
         sim_camera = new LimelightSim(camera);
-        sim_camera.withField2d(LimeLightVision.field_for_testing);
-        // WE NEED TO REFACTOR FIELD_VISUALIZER TO USE A FIELD 2d SO THAT WE CAN DO
-        // sim_camera.withField()
+
         if (data.cameraFloorRobotCenter == null) {
-            // the sim will assume its at the center of the robot and pointing forward in this state
-            // so carefull with sim. Better to have configs in code anyway
             camera.getSettings().withLimelightLEDMode(LEDMode.PipelineControl).save();
         } else {
             camera.getSettings()
@@ -73,16 +75,31 @@ public class YallLimelight {
                 DriverStation.reportWarning(
                         "THE CAMERA NAMED: "
                                 + data.name
-                                + " is not configured to be any kind of known pipeline",
+                                + " is not configured to be any known pipeline",
                         true);
                 break;
         }
     }
 
+    /**
+     * Calibrates the difference between RIO FPGATime and the Limelight hardware clock on the very
+     * first valid frame received.
+     */
+    private synchronized void synchronizeClock(Time llHardwareTimestamp) {
+        if (is_first_reading) {
+            Time rioFpgaTime = Microseconds.of(RobotController.getFPGATime());
+            time_offset = rioFpgaTime.minus(llHardwareTimestamp);
+            is_first_reading = false;
+        }
+    }
+
+    /** Converts a raw Limelight timestamp to the RIO FPGA timeline using the stored offset. */
+    private Time toRioFpgaTime(Time llHardwareTimestamp) {
+        return llHardwareTimestamp.plus(time_offset);
+    }
+
     public double calculateScore(double ambiguity, double distanceToRobot) {
-        return (2 - (ambiguity + (distanceToRobot / 4.0)))
-                / 2.0; // 4 is the max range im allowing for a comfortable detection so 0 ambiguity
-        // at 4 m is 50% confident
+        return (2 - (ambiguity + (distanceToRobot / 4.0))) / 2.0;
     }
 
     public void setThrottle(double throttle) {
@@ -93,12 +110,6 @@ public class YallLimelight {
         camera.getSettings().withImuMode(imuMode).save();
     }
 
-    /**
-     * This is the method for a singular static camera for pose finding if it is on a turret or
-     * moving you must supply the angle of the turret in periodic.
-     *
-     * @return null if not valid and the pose reported by the camera if valid
-     */
     public pose_output getRobotPoseFromVision() {
         if (!(data.cameraPipeline.equals(Pipelines.DOES_EVERYTHING)
                 || data.cameraPipeline.equals(Pipelines.POSE_DETECTION))) {
@@ -111,73 +122,65 @@ public class YallLimelight {
             functioning_as_pipeline = Pipelines.POSE_DETECTION;
             camera.getSettings().withPipelineIndex(1).save();
         }
-        // non zero offset but you havent told anything its rotation so things will be wrong. Which
-        // is why you need to tell it the rotation
-        if (!(data.cameraOffsetFromAxisOfRotation == null) && rotation_modified == false) {
+
+        if (data.cameraOffsetFromAxisOfRotation != null && !rotation_modified) {
             DriverStation.reportWarning(
-                    "YOU ARE NOT SUPLYING A ROTATION TO A ROTATING CAMERA THIS WILL MESS UP VISION"
-                            + " MEAUREMENTS",
+                    "YOU ARE NOT SUPPLYING A ROTATION TO A ROTATING CAMERA THIS WILL MESS UP VISION"
+                            + " MEASUREMENTS",
                     true);
             return null;
-        } else {
-            Optional<PoseEstimate> visionEstimate = poseEstimator.getPoseEstimate();
-            // if no tag then it will not be present
-            if (visionEstimate.isPresent()) {
-                PoseEstimate validEstimate = visionEstimate.get();
-                // criteria for a valid detection
-                // 1. Under 4 m
-                // 2. more then 1 tag
-                // 3. Low ish ambiguity (Im not quite sure what this means exactly but its in YALL
-                // Docs)
-                if (validEstimate.avgTagDist < 4
-                        && validEstimate.tagCount > 1
-                        && validEstimate.getMinTagAmbiguity() < .3) {
-                    return new pose_output(
-                            validEstimate.pose.toPose2d(),
-                            Microseconds.of(RobotController.getFPGATime()));
-                } else {
-                    // does not meet detection requirments
-                    return null;
-                }
-            } else {
-                // no measurement present
-                return null;
+        }
+
+        Optional<PoseEstimate> visionEstimate = poseEstimator.getPoseEstimate();
+        if (visionEstimate.isPresent()) {
+            PoseEstimate validEstimate = visionEstimate.get();
+
+            if (validEstimate.avgTagDist < 4
+                    && validEstimate.tagCount > 1
+                    && validEstimate.getMinTagAmbiguity() < 0.3) {
+
+                Time llTimestamp = Seconds.of(validEstimate.timestampSeconds);
+                synchronizeClock(llTimestamp);
+
+                return new pose_output(validEstimate.pose.toPose2d(), toRioFpgaTime(llTimestamp));
             }
         }
+        return null;
     }
 
-    /**
-     * Get tag translation and area based off of the id you care about and the pickyness you set
-     *
-     * @param tag_id
-     * @param pickyness is a parameter that will determine how picky the camera is with filtering
-     *     tags 0 is allow everything 1 is deny everything
-     * @return a translation 3d where x = tx y = ty and z = ta or null
-     */
+    public ArrayList<Integer> getVisibleTagIds() {
+        return visible_tag_ids;
+    }
+
     public tag_output getTagTranslation(Integer tag_id, double pickyness) {
         if (!(data.cameraPipeline.equals(Pipelines.DOES_EVERYTHING)
                 || data.cameraPipeline.equals(Pipelines.TAG_TRACKING))) {
             DriverStation.reportWarning(
-                    "YOU ARE ASKING FOR A TAG INFO FROM A NON TAG DESIGNED CAMERA", null);
+                    "YOU ARE ASKING FOR TAG INFO FROM A NON TAG DESIGNED CAMERA", null);
             return null;
         }
         if (data.cameraPipeline.equals(Pipelines.DOES_EVERYTHING)
-                && !functioning_as_pipeline.equals(Pipelines.OBJECT_DETECTION)) {
-            functioning_as_pipeline = Pipelines.OBJECT_DETECTION;
+                && !functioning_as_pipeline.equals(Pipelines.TAG_TRACKING)) {
+            functioning_as_pipeline = Pipelines.TAG_TRACKING;
             camera.getSettings().withPipelineIndex(3).save();
         }
-        LimelightData data = camera.getData();
-        for (RawFiducial tag : data.getRawFiducials()) {
-            // tag.id, tag.txnc, tag.tync, tag.ta
-            // tag.distToCamera, tag.distToRobot (meters)
-            // tag.ambiguity (0-1, lower is more trustworthy)
 
+        LimelightData limelightData = camera.getData();
+        Optional<LimelightResults> potentialResults = camera.getLatestResults();
+        if (!potentialResults.isPresent()) {
+            return null;
+        }
+
+        LimelightResults results = potentialResults.get();
+        Time llTimestamp = Milliseconds.of(results.timestamp_LIMELIGHT_publish);
+        synchronizeClock(llTimestamp);
+
+        for (RawFiducial tag : limelightData.getRawFiducials()) {
             if (tag.id == tag_id) {
                 if (calculateScore(tag.ambiguity, tag.distToCamera) >= pickyness) {
-
                     return new tag_output(
                             new Translation3d(tag.txnc, tag.tync, tag.ta),
-                            Microseconds.of(RobotController.getFPGATime()));
+                            toRioFpgaTime(llTimestamp));
                 }
             }
         }
@@ -188,26 +191,26 @@ public class YallLimelight {
         if (!(data.cameraPipeline.equals(Pipelines.DOES_EVERYTHING)
                 || data.cameraPipeline.equals(Pipelines.OBJECT_DETECTION))) {
             DriverStation.reportWarning(
-                    "YOU ARE ASKING FOR A TAG INFO FROM A NON TAG DESIGNED CAMERA", null);
+                    "YOU ARE ASKING FOR OBJECT INFO FROM A NON OBJECT DESIGNED CAMERA", null);
             return null;
         }
         if (data.cameraPipeline.equals(Pipelines.DOES_EVERYTHING)
                 && !functioning_as_pipeline.equals(Pipelines.OBJECT_DETECTION)) {
-            functioning_as_pipeline = Pipelines.TAG_TRACKING;
+            functioning_as_pipeline = Pipelines.OBJECT_DETECTION;
             camera.getSettings().withPipelineIndex(2).save();
         }
 
         Optional<LimelightResults> potential_results = camera.getLatestResults();
-
         if (!potential_results.isPresent()) {
             return null;
         }
 
         LimelightResults results = potential_results.get();
-        ArrayList<Translation3d> outputs = new ArrayList<Translation3d>();
-        for (NeuralDetector object :
-                results.targets_Detector) { // target detector is individual boxes around obj
-            // classifier is whole frame eg is frame a coral
+        Time llTimestamp = Milliseconds.of(results.timestamp_LIMELIGHT_publish);
+        synchronizeClock(llTimestamp);
+
+        ArrayList<Translation3d> outputs = new ArrayList<>();
+        for (NeuralDetector object : results.targets_Detector) {
             if (object.className.equals(objectName) && object.confidence > required_confidence) {
                 outputs.add(new Translation3d(object.tx, object.ty, object.ta));
             }
@@ -216,13 +219,25 @@ public class YallLimelight {
         if (outputs.isEmpty()) {
             return null;
         } else {
-            return new object_output(outputs, Microseconds.of(RobotController.getFPGATime()));
+            return new object_output(outputs, toRioFpgaTime(llTimestamp));
         }
     }
 
-    /** Must be called every cycle by the manager */
+    private void handleTagVisibility() {
+        RawFiducial[] potentialResults = camera.getData().getRawFiducials();
+        if (potentialResults == null || potentialResults.length == 0) {
+            visible_tag_ids.clear();
+            return;
+        }
+
+        for (RawFiducial tag : potentialResults) {
+            if (!visible_tag_ids.contains(tag.id)) {
+                visible_tag_ids.add(tag.id);
+            }
+        }
+    }
+
     public void periodic() {
-        // Must be called every cycle by the manager
         if (data.orientationSupplier != null && data.cameraOffsetFromAxisOfRotation != null) {
             rotation_modified = true;
             camera.getSettings()
@@ -235,6 +250,7 @@ public class YallLimelight {
         } else {
             camera.getSettings().withRobotOrientation(Robot.robotOrientation).save();
         }
+        handleTagVisibility();
     }
 
     public void simPeriodic(Pose2d robotPose) {

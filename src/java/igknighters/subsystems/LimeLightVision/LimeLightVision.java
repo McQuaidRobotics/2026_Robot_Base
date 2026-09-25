@@ -8,8 +8,6 @@ import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.units.measure.Time;
 import edu.wpi.first.wpilibj.RobotController;
-import edu.wpi.first.wpilibj.smartdashboard.Field2d;
-import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import igknighters.Robot;
 import igknighters.constants.SubsystemConstants.kLimelightVision;
@@ -17,11 +15,11 @@ import igknighters.subsystems.LimeLightVision.CameraData.Pipelines;
 import igknighters.subsystems.LimeLightVision.Cameras.YallLimelight;
 import igknighters.util.log.Log;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import limelight.networktables.LimelightSettings.ImuMode;
 
 public class LimeLightVision extends SubsystemBase {
-    public static Field2d field_for_testing = new Field2d();
 
     public record pose_output(Pose2d pose, Time time) {}
 
@@ -29,13 +27,12 @@ public class LimeLightVision extends SubsystemBase {
 
     public record object_output(ArrayList<Translation3d> object_info, Time time) {}
 
-    ArrayList<YallLimelight> cameras = new ArrayList<YallLimelight>();
+    private final ArrayList<YallLimelight> cameras = new ArrayList<>();
 
     public Time latestMeasurementTime = Seconds.of(0.0);
 
     public LimeLightVision() {
 
-        SmartDashboard.putData("LIMELIGHT_RAY_CAST", field_for_testing);
         cameras.add(
                 new YallLimelight(
                         new CameraData(
@@ -46,26 +43,49 @@ public class LimeLightVision extends SubsystemBase {
                 new YallLimelight(
                         new CameraData(
                                 kLimelightVision.backCam,
-                                new Pose3d(new Translation3d(), new Rotation3d(0, 0, 3.14)),
+                                new Pose3d(new Translation3d(), new Rotation3d(0, 0, Math.PI)),
                                 Pipelines.POSE_DETECTION)));
         cameras.add(
                 new YallLimelight(
                         new CameraData(
                                 kLimelightVision.rightCam,
                                 new Pose3d(
-                                        new Translation3d(), new Rotation3d(0, 0, 3 * 3.14 / 2.0)),
+                                        new Translation3d(), new Rotation3d(0, 0, 3 * Math.PI / 2)),
                                 Pipelines.POSE_DETECTION)));
         cameras.add(
                 new YallLimelight(
                         new CameraData(
                                 kLimelightVision.primaryCam,
-                                new Pose3d(new Translation3d(), new Rotation3d(0, 0, 3.14 / 2.0)),
+                                new Pose3d(new Translation3d(), new Rotation3d(0, 0, Math.PI / 2)),
                                 Pipelines.POSE_DETECTION)));
     }
 
+    public object_output getObjectInfo(String objectName, double confidence) {
+        ArrayList<Translation3d> allDetectedObjects = new ArrayList<>();
+        Time latestTime = Seconds.of(0.0);
+
+        for (YallLimelight camera : cameras) {
+            if (camera.data.cameraPipeline.equals(Pipelines.OBJECT_DETECTION)
+                    || camera.data.cameraPipeline.equals(Pipelines.DOES_EVERYTHING)) {
+
+                object_output result = camera.getObjectTranslation(objectName, confidence);
+                if (result != null && result.object_info() != null) {
+                    allDetectedObjects.addAll(result.object_info());
+                    if (result.time().gt(latestTime)) {
+                        latestTime = result.time();
+                    }
+                }
+            }
+        }
+        return new object_output(allDetectedObjects, latestTime);
+    }
+
     public List<Integer> getVisibleTagIds() {
-        // ONLY NON WORKING FEATURE. NOT SURE HOW TO IMPLEMENT WITHOUT MAKING DUPLICATE CALS
-        return new ArrayList<Integer>();
+        LinkedHashSet<Integer> visibleTagIds = new LinkedHashSet<>();
+        for (YallLimelight camera : cameras) {
+            visibleTagIds.addAll(camera.getVisibleTagIds());
+        }
+        return new ArrayList<>(visibleTagIds);
     }
 
     public void enableCameras(ImuMode IMU_MODE) {
@@ -86,28 +106,32 @@ public class LimeLightVision extends SubsystemBase {
     }
 
     public double timeSinceLastSample() {
-        return RobotController.getFPGATime() / 1e6 - latestMeasurementTime.in(Seconds);
+        return (RobotController.getFPGATime() / 1e6) - latestMeasurementTime.in(Seconds);
     }
 
     public List<pose_output> getRobotPoseFromVision() {
         if (!Robot.consts.limelightVision().disableVisionLogs()) {
             Log.log("ROBOT/Subsystems/Vison/Limelight/ENABLED", true);
         }
-        ArrayList<pose_output> outputs = new ArrayList<pose_output>();
+        ArrayList<pose_output> outputs = new ArrayList<>();
         Time max = Seconds.of(0.0);
+
         for (YallLimelight camera : cameras) {
-            if (camera.data.cameraPipeline.equals(Pipelines.POSE_DETECTION)) {
+            if (camera.data.cameraPipeline.equals(Pipelines.POSE_DETECTION)
+                    || camera.data.cameraPipeline.equals(Pipelines.DOES_EVERYTHING)) {
+
                 pose_output output = camera.getRobotPoseFromVision();
                 if (output == null) {
                     continue;
                 }
-                if (output.time.minus(max).in(Seconds) >= 0.0) {
-                    max = output.time;
+                if (output.time().gt(max)) {
+                    max = output.time();
                 }
                 outputs.add(output);
             }
         }
-        if (latestMeasurementTime.in(Seconds) < max.in(Seconds)) {
+
+        if (latestMeasurementTime.lt(max)) {
             latestMeasurementTime = max;
         }
         return outputs;

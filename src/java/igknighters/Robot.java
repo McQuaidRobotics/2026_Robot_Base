@@ -7,6 +7,7 @@ package igknighters;
 import choreo.auto.AutoChooser;
 import choreo.auto.AutoFactory;
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
@@ -225,11 +226,34 @@ public class Robot extends LoggedRobot {
         return () -> subsystems.swerve.getState().Pose;
     }
 
+    public void update_visualization_of_robot() {
+        FieldVisualizer.getInstance().updatePredictedPose(pose_pred.getPredictedPose());
+        double vectorAngleRads =
+                Math.atan(
+                        subsystems.swerve.getFieldRelativeSpeeds().vyMetersPerSecond
+                                / subsystems.swerve.getFieldRelativeSpeeds().vxMetersPerSecond);
+        FieldVisualizer.getInstance()
+                .addVelocityVector(
+                        new Pose2d(
+                                subsystems.swerve.getState().Pose.getTranslation(),
+                                new Rotation2d(vectorAngleRads)));
+        double predictedVeloVector =
+                Math.atan(
+                        pose_pred.getPredictedVelos().vyMetersPerSecond
+                                / pose_pred.getPredictedVelos().vxMetersPerSecond);
+        FieldVisualizer.getInstance()
+                .addPredictedVelocityVector(
+                        new Pose2d(
+                                subsystems.swerve.getState().Pose.getTranslation(),
+                                new Rotation2d(predictedVeloVector)));
+    }
+
     @Override
     public void robotPeriodic() {
         CommandScheduler.getInstance().run();
         pose_pred.setVelocitiesAndPose();
         pose_pred_error.logPose(subsystems.swerve.getState().Pose);
+        update_visualization_of_robot();
 
         if (kUseLimelight) {
             var driveState = subsystems.swerve.getState();

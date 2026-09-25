@@ -1,26 +1,23 @@
 package igknighters;
 
 import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.networktables.DoubleArrayPublisher;
-import edu.wpi.first.networktables.NetworkTable;
-import edu.wpi.first.networktables.NetworkTableInstance;
-import edu.wpi.first.networktables.StringPublisher;
+import edu.wpi.first.wpilibj.smartdashboard.Field2d;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import igknighters.util.TunableValues;
 import igknighters.util.TunableValues.TunableBoolean;
 import java.util.List;
 
-/**
- * FieldVisualizer provides methods to update specific objects on the field (Field2d) independently
- * of the main telemetry loop. This allows for updating vision targets, detected objects, and other
- * field elements only when necessary.
- *
- * <p>The robot base publishes only season independent overlays. Add publishers for game specific
- * targets and mechanism poses in a season repository.
- */
 public class FieldVisualizer {
+    private final Field2d field;
 
     private FieldVisualizer() {
-        fieldTypePub.set("Field2d");
+        field = new Field2d();
+        // The single entry point to SmartDashboard for field widget visuals
+        SmartDashboard.putData("Field", field);
+    }
+
+    public Field2d getField() {
+        return field;
     }
 
     private static class SingletonHelper {
@@ -36,28 +33,12 @@ public class FieldVisualizer {
     private final TunableBoolean shouldShowDrivingTarget =
             TunableValues.getBoolean("FieldVisualizer/ShowDrivingTarget", true);
 
-    private final NetworkTableInstance inst = NetworkTableInstance.getDefault();
-    private final NetworkTable table = inst.getTable("Pose");
-    private final StringPublisher fieldTypePub = table.getStringTopic(".type").publish();
-
-    private final DoubleArrayPublisher predictedFuturePose =
-            table.getDoubleArrayTopic("futurePose").publish();
-
-    private final DoubleArrayPublisher drivingTargetPub =
-            table.getDoubleArrayTopic("drivingTargetPose").publish();
-
-    private final DoubleArrayPublisher detectedObjectsPub =
-            table.getDoubleArrayTopic("detectedObjects").publish();
-
     public void updatePredictedPose(Pose2d pred_pose) {
         if (pred_pose == null) {
-            predictedFuturePose.set(new double[0]);
+            field.getObject("PREDICTED_POSE").setPose(new Pose2d());
             return;
         }
-        predictedFuturePose.set(
-                new double[] {
-                    pred_pose.getX(), pred_pose.getY(), pred_pose.getRotation().getDegrees()
-                });
+        field.getObject("PREDICTED_POSE").setPose(pred_pose);
     }
 
     /**
@@ -67,11 +48,10 @@ public class FieldVisualizer {
      */
     public void updateDrivingTarget(Pose2d target) {
         if (target == null || !shouldShowDrivingTarget.value()) {
-            drivingTargetPub.set(new double[0]);
+            field.getObject("DRIVING_TARGET").setPose(new Pose2d());
             return;
         }
-        drivingTargetPub.set(
-                new double[] {target.getX(), target.getY(), target.getRotation().getDegrees()});
+        field.getObject("DRIVING_TARGET").setPose(target);
     }
 
     /**
@@ -81,17 +61,26 @@ public class FieldVisualizer {
      */
     public void updateDetectedObjects(List<Pose2d> objects) {
         if (objects == null || objects.isEmpty() || !shouldShowDetectedObjects.value()) {
-            detectedObjectsPub.set(new double[0]);
+            field.getObject("DETECTED_OBJECTS").setPoses(List.of());
             return;
         }
-        int i = 0;
-        double[] array = new double[objects.size() * 3];
-        for (Pose2d obj : objects) {
-            array[i++] = obj.getX();
-            array[i++] = obj.getY();
-            array[i++] = obj.getRotation().getDegrees();
+        field.getObject("DETECTED_OBJECTS").setPoses(objects);
+    }
+
+    public void addVelocityVector(Pose2d velocityVector) {
+        if (velocityVector != null) {
+            field.getObject("ACTUAL_VELOCITY").setPose(velocityVector);
+        } else {
+            field.getObject("ACTUAL_VELOCITY").setPose(new Pose2d());
         }
-        detectedObjectsPub.set(array);
+    }
+
+    public void addPredictedVelocityVector(Pose2d predictedVelocityVector) {
+        if (predictedVelocityVector != null) {
+            field.getObject("PREDICTED_VELOCITY").setPose(predictedVelocityVector);
+        } else {
+            field.getObject("PREDICTED_VELOCITY").setPose(new Pose2d());
+        }
     }
 
     /**

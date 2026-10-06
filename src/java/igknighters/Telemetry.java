@@ -24,6 +24,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import org.littletonrobotics.junction.Logger;
 
 public class Telemetry {
     private final double MaxSpeed;
@@ -161,19 +163,32 @@ public class Telemetry {
         if (aprilTagLayout != null) {
             List<Integer> visibleIds = subsystems.vision.getVisibleTagIds();
             Map<Integer, Pose3d> allTagPoses = aprilTagLayout.getTagPoses();
-            List<Pose2d> seenTagPoses = new ArrayList<>();
-            List<Pose2d> unseenTagPoses = new ArrayList<>();
+            List<Pose3d> seenTagPoses = new ArrayList<>();
+            List<Pose3d> unseenTagPoses = new ArrayList<>();
 
             for (Map.Entry<Integer, Pose3d> entry : allTagPoses.entrySet()) {
                 if (visibleIds.contains(entry.getKey())) {
-                    seenTagPoses.add(entry.getValue().toPose2d());
+                    seenTagPoses.add(entry.getValue());
                 } else {
-                    unseenTagPoses.add(entry.getValue().toPose2d());
+                    unseenTagPoses.add(entry.getValue());
                 }
             }
 
-            field.getObject("seenTags").setPoses(seenTagPoses);
-            field.getObject("unseenTags").setPoses(unseenTagPoses);
+            field.getObject("SEEN_TAGS")
+                    .setPoses(
+                            seenTagPoses.stream()
+                                    .map(Pose3d::toPose2d)
+                                    .collect(Collectors.toList()));
+            field.getObject("UNSEEN_TAGS")
+                    .setPoses(
+                            unseenTagPoses.stream()
+                                    .map(Pose3d::toPose2d)
+                                    .collect(Collectors.toList()));
+
+            Logger.recordOutput(
+                    "ROBOT/SUBSYSTEMS/VISION/SEEN_TAGS", seenTagPoses.toArray(Pose3d[]::new));
+            Logger.recordOutput(
+                    "ROBOT/SUBSYSTEMS/VISION/UNSEEN_TAGS", unseenTagPoses.toArray(Pose3d[]::new));
         }
 
         /* Telemeterize the module states to a Mechanism2d */

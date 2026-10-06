@@ -37,7 +37,7 @@ public class LimeLightVision extends SubsystemBase {
                 new YallLimelight(
                         new CameraData(
                                 kLimelightVision.frontCam,
-                                new Pose3d(new Translation3d(), new Rotation3d(0, 0, 0)),
+                                new Pose3d(null, new Rotation3d(0, 0, 0)),
                                 Pipelines.POSE_DETECTION)));
         cameras.add(
                 new YallLimelight(

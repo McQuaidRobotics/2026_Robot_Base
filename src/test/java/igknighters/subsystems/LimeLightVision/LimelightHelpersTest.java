@@ -22,7 +22,8 @@ import org.junit.jupiter.api.Test;
 class LimeLightVisionTest {
 
     private CameraData createData(String name, Pipelines pipeline) {
-        return new CameraData(name, new Pose3d(new Translation3d(), new Rotation3d()), pipeline);
+        return new CameraData(
+                name, new Pose3d(new Translation3d(), new Rotation3d()), pipeline, false);
     }
 
     @BeforeEach

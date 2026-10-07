@@ -49,9 +49,11 @@ public class YallLimelight {
         camera = new Limelight(data.name);
         sim_camera = new LimelightSim(camera);
 
-        if (data.cameraFloorRobotCenter == null) {
+        if (data.use_nt_position) {
+            // stick with internal config
             camera.getSettings().withLimelightLEDMode(LEDMode.PipelineControl).save();
         } else {
+            // apply offset
             camera.getSettings()
                     .withLimelightLEDMode(LEDMode.PipelineControl)
                     .withCameraOffset(data.cameraFloorRobotCenter)
@@ -238,7 +240,9 @@ public class YallLimelight {
     }
 
     public void periodic() {
-        if (data.orientationSupplier != null && data.cameraOffsetFromAxisOfRotation != null) {
+        if (data.orientationSupplier != null
+                && data.cameraOffsetFromAxisOfRotation != null
+                && !data.use_nt_position) {
             rotation_modified = true;
             camera.getSettings()
                     .withRobotOrientation(Robot.robotOrientation)

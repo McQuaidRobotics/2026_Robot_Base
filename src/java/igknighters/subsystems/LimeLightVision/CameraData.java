@@ -11,6 +11,7 @@ public class CameraData {
     public Pipelines cameraPipeline;
     public String name;
     public Supplier<Rotation3d> orientationSupplier;
+    public boolean use_nt_position = false;
 
     public enum Pipelines {
         OBJECT_DETECTION, // output coords of game piece in field map
@@ -40,7 +41,11 @@ public class CameraData {
      * @param cameraFloorRobotCenter
      * @param cameraPipeline
      */
-    public CameraData(String name, Pose3d cameraFloorRobotCenter, Pipelines cameraPipeline) {
+    public CameraData(
+            String name,
+            Pose3d cameraFloorRobotCenter,
+            Pipelines cameraPipeline,
+            boolean use_nt_position) {
         this.name = name;
         this.cameraFloorRobotCenter = cameraFloorRobotCenter;
         this.cameraPipeline = cameraPipeline;

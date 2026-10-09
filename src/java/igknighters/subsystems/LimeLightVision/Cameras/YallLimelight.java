@@ -6,7 +6,9 @@ import static edu.wpi.first.units.Units.Seconds;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
+import edu.wpi.first.math.geometry.Transform3d;
 import edu.wpi.first.math.geometry.Translation3d;
+import edu.wpi.first.networktables.DoubleArrayPublisher;
 import edu.wpi.first.units.measure.Time;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.RobotController;
@@ -25,6 +27,7 @@ import limelight.networktables.LimelightPoseEstimator.EstimationMode;
 import limelight.networktables.LimelightResults;
 import limelight.networktables.LimelightSettings.ImuMode;
 import limelight.networktables.LimelightSettings.LEDMode;
+import limelight.networktables.LimelightUtils;
 import limelight.networktables.PoseEstimate;
 import limelight.networktables.target.pipeline.NeuralDetector;
 import limelight.results.RawFiducial;
@@ -40,6 +43,10 @@ public class YallLimelight {
 
     public final ArrayList<Integer> visible_tag_ids = new ArrayList<>();
 
+    // Same NT topic as LimelightSettings.withRobotOrientation, but without its per-call flush.
+    // LimeLightVision.periodic flushes once for all cameras.
+    private final DoubleArrayPublisher robotOrientationPub;
+
     // Offset: (RIO FPGA Time) - (Limelight Hardware Time)
     public Time time_offset = Seconds.of(0);
     public boolean is_first_reading = true;
@@ -47,7 +54,9 @@ public class YallLimelight {
     public YallLimelight(CameraData data) {
         this.data = data;
         camera = new Limelight(data.name);
-        sim_camera = new LimelightSim(camera);
+        sim_camera = new LimelightSim(camera).withVideoStream();
+        robotOrientationPub =
+                camera.getNTTable().getDoubleArrayTopic("robot_orientation_set").publish();
 
         if (data.use_nt_position) {
             // stick with internal config
@@ -58,6 +67,10 @@ public class YallLimelight {
                     .withLimelightLEDMode(LEDMode.PipelineControl)
                     .withCameraOffset(data.cameraFloorRobotCenter)
                     .save();
+            sim_camera.withRobotToCameraTransform(
+                    new Transform3d(
+                            data.cameraFloorRobotCenter.getTranslation(),
+                            data.cameraFloorRobotCenter.getRotation()));
         }
         poseEstimator = camera.createPoseEstimator(EstimationMode.MEGATAG2);
 
@@ -239,21 +252,19 @@ public class YallLimelight {
         }
     }
 
+    /** Publishes orientation (and moving-camera offset) without flushing; caller flushes. */
     public void periodic() {
         if (data.orientationSupplier != null
                 && data.cameraOffsetFromAxisOfRotation != null
                 && !data.use_nt_position) {
             rotation_modified = true;
             camera.getSettings()
-                    .withRobotOrientation(Robot.robotOrientation)
                     .withCameraOffset(
                             new Pose3d(
                                     data.cameraOffsetFromAxisOfRotation.getTranslation(),
-                                    data.orientationSupplier.get()))
-                    .save();
-        } else {
-            camera.getSettings().withRobotOrientation(Robot.robotOrientation).save();
+                                    data.orientationSupplier.get()));
         }
+        robotOrientationPub.set(LimelightUtils.orientation3dToArray(Robot.robotOrientation));
         handleTagVisibility();
     }
 

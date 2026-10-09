@@ -50,6 +50,7 @@ public class CameraData {
         this.cameraFloorRobotCenter = cameraFloorRobotCenter;
         this.cameraPipeline = cameraPipeline;
         this.cameraOffsetFromAxisOfRotation = null;
+        this.use_nt_position = use_nt_position;
     }
 
     /**

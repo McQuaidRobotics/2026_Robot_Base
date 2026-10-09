@@ -3,14 +3,12 @@ package igknighters.subsystems.LimeLightVision;
 import static edu.wpi.first.units.Units.Seconds;
 
 import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.geometry.Pose3d;
-import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Translation3d;
+import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.units.measure.Time;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import igknighters.Robot;
-import igknighters.constants.SubsystemConstants.kLimelightVision;
 import igknighters.subsystems.LimeLightVision.CameraData.Pipelines;
 import igknighters.subsystems.LimeLightVision.Cameras.YallLimelight;
 import igknighters.util.log.Log;
@@ -36,32 +34,31 @@ public class LimeLightVision extends SubsystemBase {
         cameras.add(
                 new YallLimelight(
                         new CameraData(
-                                kLimelightVision.frontCam,
-                                new Pose3d(new Translation3d(), new Rotation3d(0, 0, 0)),
+                                Robot.consts.limelightVision().frontCam(),
+                                Robot.consts.limelightVision().frontCamPose(),
                                 Pipelines.POSE_DETECTION,
-                                true)));
+                                false)));
         cameras.add(
                 new YallLimelight(
                         new CameraData(
-                                kLimelightVision.backCam,
-                                new Pose3d(new Translation3d(), new Rotation3d(0, 0, Math.PI)),
+                                Robot.consts.limelightVision().backCam(),
+                                Robot.consts.limelightVision().backCamPose(),
                                 Pipelines.POSE_DETECTION,
-                                true)));
+                                false)));
         cameras.add(
                 new YallLimelight(
                         new CameraData(
-                                kLimelightVision.rightCam,
-                                new Pose3d(
-                                        new Translation3d(), new Rotation3d(0, 0, 3 * Math.PI / 2)),
+                                Robot.consts.limelightVision().primaryCam(),
+                                Robot.consts.limelightVision().primaryCamPose(),
                                 Pipelines.POSE_DETECTION,
-                                true)));
+                                false)));
         cameras.add(
                 new YallLimelight(
                         new CameraData(
-                                kLimelightVision.primaryCam,
-                                new Pose3d(new Translation3d(), new Rotation3d(0, 0, Math.PI / 2)),
+                                Robot.consts.limelightVision().leftCam(),
+                                Robot.consts.limelightVision().leftCamPose(),
                                 Pipelines.POSE_DETECTION,
-                                true)));
+                                false)));
     }
 
     public object_output getObjectInfo(String objectName, double confidence) {
@@ -146,6 +143,8 @@ public class LimeLightVision extends SubsystemBase {
         for (YallLimelight limelight : cameras) {
             limelight.periodic();
         }
+        // one flush for all cameras instead of two per camera
+        NetworkTableInstance.getDefault().flush();
     }
 
     @Override

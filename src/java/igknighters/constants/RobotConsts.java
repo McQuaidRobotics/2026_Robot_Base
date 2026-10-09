@@ -1,5 +1,6 @@
 package igknighters.constants;
 
+import edu.wpi.first.math.geometry.Pose3d;
 import igknighters.subsystems.swerve.swerveconstants.CommonSwerveConsts;
 
 /**
@@ -28,11 +29,19 @@ public abstract class RobotConsts {
     public interface kLimelightVisionConsts {
         String primaryCam();
 
+        Pose3d primaryCamPose();
+
         String frontCam();
+
+        Pose3d frontCamPose();
 
         String backCam();
 
-        String rightCam();
+        Pose3d backCamPose();
+
+        String leftCam();
+
+        Pose3d leftCamPose();
 
         boolean disableVisionLogs();
     }

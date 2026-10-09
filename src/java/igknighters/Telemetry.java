@@ -73,7 +73,7 @@ public class Telemetry {
 
     /* Robot pose for field positioning */
     private final NetworkTable table = inst.getTable("Pose");
-    private final DoubleArrayPublisher fieldPub = table.getDoubleArrayTopic("robotPose").publish();
+    private final DoubleArrayPublisher fieldPub = table.getDoubleArrayTopic("Robot").publish();
     private final StringPublisher fieldTypePub = table.getStringTopic(".type").publish();
     private final DoubleArrayPublisher seenTagsPub =
             table.getDoubleArrayTopic("seenTags").publish();

@@ -54,7 +54,7 @@ public class YallLimelight {
     public YallLimelight(CameraData data) {
         this.data = data;
         camera = new Limelight(data.name);
-        sim_camera = new LimelightSim(camera).withVideoStream("C:/FRC/libraries/Block cad.stl");
+        sim_camera = new LimelightSim(camera);
         robotOrientationPub =
                 camera.getNTTable().getDoubleArrayTopic("robot_orientation_set").publish();
 

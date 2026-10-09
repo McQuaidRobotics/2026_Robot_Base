@@ -22,7 +22,6 @@ sourceSets {
     main {
         java {
             srcDir 'src/java'
-            srcDir 'C:/FRC/libraries/YALL/yall/java' // Local YALL for testing; restore vendordeps/yall.json to undo
         }
     }
     test {

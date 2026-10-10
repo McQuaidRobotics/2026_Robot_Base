@@ -13,7 +13,6 @@ import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
-import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import igknighters.commands.teleop.TeleopSwerveWithDetune;
 import igknighters.constants.DrivingSharedState;
 import igknighters.constants.FirstBotConsts;
@@ -333,7 +332,7 @@ public class Robot extends LoggedRobot {
     public void testExit() {}
 
     public static boolean isRobotTest() {
-        return RobotModeTriggers.test().getAsBoolean();
+        return DriverStation.isTestEnabled();
     }
 
     public static boolean isBlue() {

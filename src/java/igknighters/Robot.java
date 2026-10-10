@@ -222,7 +222,7 @@ public class Robot extends LoggedRobot {
                 new Subsystems(
                         new Swerve(isSwerveDisabled),
                         new LimeLightVision(),
-                        new Led(90, 2),
+                        new Led(90, 1),
                         new Luma(true, "object-detection"));
         setUpSwerve(subsystems);
         pose_pred = new RobotPosePredictor(subsystems.swerve);

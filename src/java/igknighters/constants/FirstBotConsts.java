@@ -36,9 +36,9 @@ public class FirstBotConsts extends RobotConsts {
     }
 
     public static class FirstBotLimelightVisionConsts implements kLimelightVisionConsts {
-        // NOTE LIMELIGHTS ARE WEIERD THE FORWARD AXIS IS X, THE LEFT RIGHT AXIS IS Y with right = +, roll pitch and yaw  all based on counterclockwise rotation so ignore rotation 3d docs
-        
-        
+        // NOTE LIMELIGHTS ARE WEIERD THE FORWARD AXIS IS X, THE LEFT RIGHT AXIS IS Y with right =
+        // +, roll pitch and yaw  all based on counterclockwise rotation so ignore rotation 3d docs
+
         @Override
         public String primaryCam() {
             return "limelight";
@@ -77,10 +77,11 @@ public class FirstBotConsts extends RobotConsts {
         @Override
         public Pose3d backCamPose() {
             return new Pose3d(
-                -0.3128518,
-                    -0.2203704,
-                    0.19939,
-                    new Rotation3d(0.0, Math.toRadians(15.0), Math.toRadians(180.0)));
+                    -0.31455,
+                    -0.2989,
+                    0.19624,
+                    new Rotation3d(
+                            Math.toRadians(180), Math.toRadians(15.0), Math.toRadians(180.0)));
         }
 
         @Override
@@ -91,10 +92,11 @@ public class FirstBotConsts extends RobotConsts {
         @Override
         public Pose3d leftCamPose() {
             return new Pose3d(
-                    -0.3128518,
-                    -0.2203704,
-                    0.19939,
-                    new Rotation3d(0.0, Math.toRadians(15.0), Math.toRadians(90.0)));
+                    -0.21767,
+                    -0.31455,
+                    0.19625,
+                    new Rotation3d(
+                            Math.toRadians(180), Math.toRadians(15.0), Math.toRadians(90.0)));
         }
 
         @Override

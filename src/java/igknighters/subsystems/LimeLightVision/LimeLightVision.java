@@ -38,27 +38,27 @@ public class LimeLightVision extends SubsystemBase {
                                 Robot.consts.limelightVision().frontCamPose(),
                                 Pipelines.POSE_DETECTION,
                                 false)));
-        cameras.add(
-                new YallLimelight(
-                        new CameraData(
-                                Robot.consts.limelightVision().backCam(),
-                                Robot.consts.limelightVision().backCamPose(),
-                                Pipelines.POSE_DETECTION,
-                                false)));
-        cameras.add(
-                new YallLimelight(
-                        new CameraData(
-                                Robot.consts.limelightVision().primaryCam(),
-                                Robot.consts.limelightVision().primaryCamPose(),
-                                Pipelines.POSE_DETECTION,
-                                false)));
-        cameras.add(
-                new YallLimelight(
-                        new CameraData(
-                                Robot.consts.limelightVision().leftCam(),
-                                Robot.consts.limelightVision().leftCamPose(),
-                                Pipelines.POSE_DETECTION,
-                                false)));
+        // cameras.add(
+        //         new YallLimelight(
+        //                 new CameraData(
+        //                         Robot.consts.limelightVision().backCam(),
+        //                         Robot.consts.limelightVision().backCamPose(),
+        //                         Pipelines.POSE_DETECTION,
+        //                         false)));
+        // cameras.add(
+        //         new YallLimelight(
+        //                 new CameraData(
+        //                         Robot.consts.limelightVision().primaryCam(),
+        //                         Robot.consts.limelightVision().primaryCamPose(),
+        //                         Pipelines.POSE_DETECTION,
+        //                         false)));
+        // cameras.add(
+        //         new YallLimelight(
+        //                 new CameraData(
+        //                         Robot.consts.limelightVision().leftCam(),
+        //                         Robot.consts.limelightVision().leftCamPose(),
+        //                         Pipelines.POSE_DETECTION,
+        //                         false)));
     }
 
     public object_output getObjectInfo(String objectName, double confidence) {

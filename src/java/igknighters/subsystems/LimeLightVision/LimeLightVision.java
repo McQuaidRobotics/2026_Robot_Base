@@ -9,6 +9,7 @@ import edu.wpi.first.units.measure.Time;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import igknighters.Robot;
+import igknighters.constants.RobotIdentity;
 import igknighters.subsystems.LimeLightVision.CameraData.Pipelines;
 import igknighters.subsystems.LimeLightVision.Cameras.YallLimelight;
 import igknighters.util.log.Log;
@@ -30,7 +31,7 @@ public class LimeLightVision extends SubsystemBase {
     public Time latestMeasurementTime = Seconds.of(0.0);
 
     public LimeLightVision() {
-
+        if (RobotIdentity.isFirstBot()) {
         cameras.add(
                 new YallLimelight(
                         new CameraData(
@@ -59,6 +60,36 @@ public class LimeLightVision extends SubsystemBase {
                                 Robot.consts.limelightVision().leftCamPose(),
                                 Pipelines.POSE_DETECTION,
                                 false)));
+        } else { // because we will compete with v2 and I do not want to mess up the positions of cams this is a safegaurd
+            cameras.add(
+                new YallLimelight(
+                        new CameraData(
+                                Robot.consts.limelightVision().frontCam(),
+                                Robot.consts.limelightVision().frontCamPose(),
+                                Pipelines.POSE_DETECTION,
+                                true)));
+        cameras.add(
+                new YallLimelight(
+                        new CameraData(
+                                Robot.consts.limelightVision().backCam(),
+                                Robot.consts.limelightVision().backCamPose(),
+                                Pipelines.POSE_DETECTION,
+                                true)));
+        cameras.add(
+                new YallLimelight(
+                        new CameraData(
+                                Robot.consts.limelightVision().primaryCam(),
+                                Robot.consts.limelightVision().primaryCamPose(),
+                                Pipelines.POSE_DETECTION,
+                                true)));
+        cameras.add(
+                new YallLimelight(
+                        new CameraData(
+                                Robot.consts.limelightVision().leftCam(),
+                                Robot.consts.limelightVision().leftCamPose(),
+                                Pipelines.POSE_DETECTION,
+                                true)));
+        }
     }
 
     public object_output getObjectInfo(String objectName, double confidence) {

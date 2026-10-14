@@ -32,63 +32,64 @@ public class LimeLightVision extends SubsystemBase {
 
     public LimeLightVision() {
         if (RobotIdentity.isFirstBot()) {
-        cameras.add(
-                new YallLimelight(
-                        new CameraData(
-                                Robot.consts.limelightVision().frontCam(),
-                                Robot.consts.limelightVision().frontCamPose(),
-                                Pipelines.POSE_DETECTION,
-                                false)));
-        cameras.add(
-                new YallLimelight(
-                        new CameraData(
-                                Robot.consts.limelightVision().backCam(),
-                                Robot.consts.limelightVision().backCamPose(),
-                                Pipelines.POSE_DETECTION,
-                                false)));
-        cameras.add(
-                new YallLimelight(
-                        new CameraData(
-                                Robot.consts.limelightVision().primaryCam(),
-                                Robot.consts.limelightVision().primaryCamPose(),
-                                Pipelines.POSE_DETECTION,
-                                false)));
-        cameras.add(
-                new YallLimelight(
-                        new CameraData(
-                                Robot.consts.limelightVision().leftCam(),
-                                Robot.consts.limelightVision().leftCamPose(),
-                                Pipelines.POSE_DETECTION,
-                                false)));
-        } else { // because we will compete with v2 and I do not want to mess up the positions of cams this is a safegaurd
             cameras.add(
-                new YallLimelight(
-                        new CameraData(
-                                Robot.consts.limelightVision().frontCam(),
-                                Robot.consts.limelightVision().frontCamPose(),
-                                Pipelines.POSE_DETECTION,
-                                true)));
-        cameras.add(
-                new YallLimelight(
-                        new CameraData(
-                                Robot.consts.limelightVision().backCam(),
-                                Robot.consts.limelightVision().backCamPose(),
-                                Pipelines.POSE_DETECTION,
-                                true)));
-        cameras.add(
-                new YallLimelight(
-                        new CameraData(
-                                Robot.consts.limelightVision().primaryCam(),
-                                Robot.consts.limelightVision().primaryCamPose(),
-                                Pipelines.POSE_DETECTION,
-                                true)));
-        cameras.add(
-                new YallLimelight(
-                        new CameraData(
-                                Robot.consts.limelightVision().leftCam(),
-                                Robot.consts.limelightVision().leftCamPose(),
-                                Pipelines.POSE_DETECTION,
-                                true)));
+                    new YallLimelight(
+                            new CameraData(
+                                    Robot.consts.limelightVision().frontCam(),
+                                    Robot.consts.limelightVision().frontCamPose(),
+                                    Pipelines.POSE_DETECTION,
+                                    false)));
+            cameras.add(
+                    new YallLimelight(
+                            new CameraData(
+                                    Robot.consts.limelightVision().backCam(),
+                                    Robot.consts.limelightVision().backCamPose(),
+                                    Pipelines.POSE_DETECTION,
+                                    false)));
+            cameras.add(
+                    new YallLimelight(
+                            new CameraData(
+                                    Robot.consts.limelightVision().primaryCam(),
+                                    Robot.consts.limelightVision().primaryCamPose(),
+                                    Pipelines.POSE_DETECTION,
+                                    false)));
+            cameras.add(
+                    new YallLimelight(
+                            new CameraData(
+                                    Robot.consts.limelightVision().leftCam(),
+                                    Robot.consts.limelightVision().leftCamPose(),
+                                    Pipelines.POSE_DETECTION,
+                                    false)));
+        } else { // because we will compete with v2 and I do not want to mess up the positions of
+            // cams this is a safegaurd
+            cameras.add(
+                    new YallLimelight(
+                            new CameraData(
+                                    Robot.consts.limelightVision().frontCam(),
+                                    Robot.consts.limelightVision().frontCamPose(),
+                                    Pipelines.POSE_DETECTION,
+                                    true)));
+            cameras.add(
+                    new YallLimelight(
+                            new CameraData(
+                                    Robot.consts.limelightVision().backCam(),
+                                    Robot.consts.limelightVision().backCamPose(),
+                                    Pipelines.POSE_DETECTION,
+                                    true)));
+            cameras.add(
+                    new YallLimelight(
+                            new CameraData(
+                                    Robot.consts.limelightVision().primaryCam(),
+                                    Robot.consts.limelightVision().primaryCamPose(),
+                                    Pipelines.POSE_DETECTION,
+                                    true)));
+            cameras.add(
+                    new YallLimelight(
+                            new CameraData(
+                                    Robot.consts.limelightVision().leftCam(),
+                                    Robot.consts.limelightVision().leftCamPose(),
+                                    Pipelines.POSE_DETECTION,
+                                    true)));
         }
     }
 

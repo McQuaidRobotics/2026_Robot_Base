@@ -9,9 +9,11 @@ import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Transform3d;
 import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.networktables.DoubleArrayPublisher;
+import edu.wpi.first.networktables.DoubleSubscriber;
 import edu.wpi.first.units.measure.Time;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.RobotController;
+import edu.wpi.first.wpilibj.Timer;
 import igknighters.Robot;
 import igknighters.subsystems.LimeLightVision.CameraData;
 import igknighters.subsystems.LimeLightVision.CameraData.Pipelines;
@@ -47,6 +49,12 @@ public class YallLimelight {
     // LimeLightVision.periodic flushes once for all cameras.
     private final DoubleArrayPublisher robotOrientationPub;
 
+    // Pipeline the camera reports it is running; -1 while it is not connected.
+    private final DoubleSubscriber activePipelineSub;
+    private int desiredPipeline = -1;
+    private ImuMode imuMode = null;
+    private double lastApplySeconds = 0.0;
+
     // Offset: (RIO FPGA Time) - (Limelight Hardware Time)
     public Time time_offset = Seconds.of(0);
     public boolean is_first_reading = true;
@@ -58,31 +66,24 @@ public class YallLimelight {
         robotOrientationPub =
                 camera.getNTTable().getDoubleArrayTopic("robot_orientation_set").publish();
 
-        if (data.use_nt_position) {
-            // stick with internal config
-            camera.getSettings().withLimelightLEDMode(LEDMode.PipelineControl).save();
-        } else {
-            // apply offset
-            camera.getSettings()
-                    .withLimelightLEDMode(LEDMode.PipelineControl)
-                    .withCameraOffset(data.cameraFloorRobotCenter)
-                    .save();
-            sim_camera.withRobotToCameraTransform(
-                    new Transform3d(
-                            data.cameraFloorRobotCenter.getTranslation(),
-                            data.cameraFloorRobotCenter.getRotation()));
-        }
+        activePipelineSub = camera.getNTTable().getDoubleTopic("getpipe").subscribe(-1);
+
+        // Only the sim gets the code-side pose; real cameras use the pose set in their web UI.
+        sim_camera.withRobotToCameraTransform(
+                new Transform3d(
+                        data.cameraFloorRobotCenter.getTranslation(),
+                        data.cameraFloorRobotCenter.getRotation()));
         poseEstimator = camera.createPoseEstimator(EstimationMode.MEGATAG2);
 
         switch (data.cameraPipeline) {
             case POSE_DETECTION:
-                camera.getSettings().withPipelineIndex(1).save();
+                desiredPipeline = 1;
                 break;
             case OBJECT_DETECTION:
-                camera.getSettings().withPipelineIndex(2).save();
+                desiredPipeline = 2;
                 break;
             case TAG_TRACKING:
-                camera.getSettings().withPipelineIndex(3).save();
+                desiredPipeline = 3;
                 break;
             case DOES_EVERYTHING:
                 break;
@@ -94,6 +95,28 @@ public class YallLimelight {
                         true);
                 break;
         }
+        applySettings();
+    }
+
+    /**
+     * NT settings live only in the Limelight's RAM; a power cycle reverts them to the web-UI
+     * config. Sent at startup and again whenever the camera reports the wrong pipeline.
+     */
+    private void applySettings() {
+        var settings = camera.getSettings().withLimelightLEDMode(LEDMode.PipelineControl);
+        if (desiredPipeline >= 0) {
+            settings.withPipelineIndex(desiredPipeline);
+        }
+        if (imuMode != null) {
+            settings.withImuMode(imuMode);
+        }
+        settings.save();
+        lastApplySeconds = Timer.getFPGATimestamp();
+    }
+
+    private void setPipeline(int index) {
+        desiredPipeline = index;
+        camera.getSettings().withPipelineIndex(index).save();
     }
 
     /**
@@ -122,6 +145,7 @@ public class YallLimelight {
     }
 
     public void setIMUMode(ImuMode imuMode) {
+        this.imuMode = imuMode;
         camera.getSettings().withImuMode(imuMode).save();
     }
 
@@ -135,7 +159,7 @@ public class YallLimelight {
         if (data.cameraPipeline.equals(Pipelines.DOES_EVERYTHING)
                 && !functioning_as_pipeline.equals(Pipelines.POSE_DETECTION)) {
             functioning_as_pipeline = Pipelines.POSE_DETECTION;
-            camera.getSettings().withPipelineIndex(1).save();
+            setPipeline(1);
         }
 
         if (data.cameraOffsetFromAxisOfRotation != null && !rotation_modified) {
@@ -177,7 +201,7 @@ public class YallLimelight {
         if (data.cameraPipeline.equals(Pipelines.DOES_EVERYTHING)
                 && !functioning_as_pipeline.equals(Pipelines.TAG_TRACKING)) {
             functioning_as_pipeline = Pipelines.TAG_TRACKING;
-            camera.getSettings().withPipelineIndex(3).save();
+            setPipeline(3);
         }
 
         LimelightData limelightData = camera.getData();
@@ -212,7 +236,7 @@ public class YallLimelight {
         if (data.cameraPipeline.equals(Pipelines.DOES_EVERYTHING)
                 && !functioning_as_pipeline.equals(Pipelines.OBJECT_DETECTION)) {
             functioning_as_pipeline = Pipelines.OBJECT_DETECTION;
-            camera.getSettings().withPipelineIndex(2).save();
+            setPipeline(2);
         }
 
         Optional<LimelightResults> potential_results = camera.getLatestResults();
@@ -254,6 +278,15 @@ public class YallLimelight {
 
     /** Publishes orientation (and moving-camera offset) without flushing; caller flushes. */
     public void periodic() {
+        double activePipeline = activePipelineSub.get();
+        if (activePipeline >= 0
+                && desiredPipeline >= 0
+                && activePipeline != desiredPipeline
+                && Timer.getFPGATimestamp() - lastApplySeconds > 1.0) {
+            // camera rebooted (or never got our settings); its clock restarted too
+            applySettings();
+            is_first_reading = true;
+        }
         if (data.orientationSupplier != null
                 && data.cameraOffsetFromAxisOfRotation != null
                 && !data.use_nt_position) {

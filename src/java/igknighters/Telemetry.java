@@ -7,13 +7,12 @@ import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
-import edu.wpi.first.networktables.DoubleArrayPublisher;
 import edu.wpi.first.networktables.DoublePublisher;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableInstance;
-import edu.wpi.first.networktables.StringPublisher;
 import edu.wpi.first.networktables.StructArrayPublisher;
 import edu.wpi.first.networktables.StructPublisher;
+import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.Mechanism2d;
 import edu.wpi.first.wpilibj.smartdashboard.MechanismLigament2d;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -22,6 +21,7 @@ import edu.wpi.first.wpilibj.util.Color8Bit;
 import igknighters.subsystems.Subsystems;
 import igknighters.util.AprilTagLayout;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -30,10 +30,14 @@ public class Telemetry {
     private final Subsystems subsystems;
     private AprilTagLayout aprilTagLayout;
 
+    // Use the single Field2d instance managed by FieldVisualizer
+    private final Field2d field = FieldVisualizer.getInstance().getField();
+
     /**
      * Construct a telemetry object, with the specified max speed of the robot
      *
      * @param maxSpeed Maximum speed in meters per second
+     * @param subsystems Subsystems reference
      */
     public Telemetry(double maxSpeed, Subsystems subsystems) {
         MaxSpeed = maxSpeed;
@@ -41,7 +45,6 @@ public class Telemetry {
         try {
             aprilTagLayout = new AprilTagLayout();
         } catch (IOException e) {
-            //     System.out.println("Could not load AprilTag layout");
             e.printStackTrace();
         }
         SignalLogger.start();
@@ -70,24 +73,6 @@ public class Telemetry {
             driveStateTable.getDoubleTopic("Timestamp").publish();
     private final DoublePublisher driveOdometryFrequency =
             driveStateTable.getDoubleTopic("OdometryFrequency").publish();
-
-    /* Robot pose for field positioning */
-    private final NetworkTable table = inst.getTable("Pose");
-    private final DoubleArrayPublisher fieldPub = table.getDoubleArrayTopic("robotPose").publish();
-    private final StringPublisher fieldTypePub = table.getStringTopic(".type").publish();
-    private final DoubleArrayPublisher seenTagsPub =
-            table.getDoubleArrayTopic("seenTags").publish();
-    private final DoubleArrayPublisher unseenTagsPub =
-            table.getDoubleArrayTopic("unseenTags").publish();
-
-    private final DoubleArrayPublisher shootingTargetPosesPub =
-            table.getDoubleArrayTopic("shootingTargetPose").publish();
-
-    private final DoubleArrayPublisher drivingTargetPub =
-            table.getDoubleArrayTopic("drivingTargetPose").publish();
-
-    private final DoubleArrayPublisher detectedObjectsPub =
-            table.getDoubleArrayTopic("detectedObjects").publish();
 
     /* Mechanisms to represent the swerve module states */
     private final Mechanism2d[] m_moduleMechanisms =
@@ -169,15 +154,15 @@ public class Telemetry {
         SignalLogger.writeDoubleArray("DriveState/ModuleTargets", m_moduleTargetsArray);
         SignalLogger.writeDouble("DriveState/OdometryPeriod", state.OdometryPeriod, "seconds");
 
-        /* Telemeterize the pose to a Field2d */
-        fieldTypePub.set("Field2d");
-        fieldPub.set(m_poseArray);
+        /* Update main Robot Pose on Field2d */
+        field.setRobotPose(state.Pose);
 
+        /* Update AprilTags on Field2d */
         if (aprilTagLayout != null) {
             List<Integer> visibleIds = subsystems.vision.getVisibleTagIds();
             Map<Integer, Pose3d> allTagPoses = aprilTagLayout.getTagPoses();
-            List<Pose2d> seenTagPoses = new java.util.ArrayList<>();
-            List<Pose2d> unseenTagPoses = new java.util.ArrayList<>();
+            List<Pose2d> seenTagPoses = new ArrayList<>();
+            List<Pose2d> unseenTagPoses = new ArrayList<>();
 
             for (Map.Entry<Integer, Pose3d> entry : allTagPoses.entrySet()) {
                 if (visibleIds.contains(entry.getKey())) {
@@ -187,26 +172,8 @@ public class Telemetry {
                 }
             }
 
-            double[] seenTagsArray = new double[seenTagPoses.size() * 3];
-            int i = 0;
-            for (Pose2d pose : seenTagPoses) {
-                seenTagsArray[i++] = pose.getX();
-                seenTagsArray[i++] = pose.getY();
-                seenTagsArray[i++] = pose.getRotation().getDegrees();
-            }
-            seenTagsPub.set(seenTagsArray);
-
-            double[] unseenTagsArray = new double[unseenTagPoses.size() * 3];
-            i = 0;
-            for (Pose2d pose : unseenTagPoses) {
-                unseenTagsArray[i++] = pose.getX();
-                unseenTagsArray[i++] = pose.getY();
-                unseenTagsArray[i++] = pose.getRotation().getDegrees();
-            }
-            unseenTagsPub.set(unseenTagsArray);
-        } else {
-            //     System.out.println("APRIL TAG LAYOUT NOT FOUND");
-            //     System.out.println("APRIL TAGS NEED TO BE LOADED TO SHOW THE SEEN TAGS");
+            field.getObject("seenTags").setPoses(seenTagPoses);
+            field.getObject("unseenTags").setPoses(unseenTagPoses);
         }
 
         /* Telemeterize the module states to a Mechanism2d */
@@ -221,29 +188,18 @@ public class Telemetry {
     }
 
     public void addShootingTargetPose(Pose2d targetPose) {
-        double[] targetPoseArray = new double[3];
-        targetPoseArray[0] = targetPose.getX();
-        targetPoseArray[1] = targetPose.getY();
-        targetPoseArray[2] = targetPose.getRotation().getDegrees();
-        shootingTargetPosesPub.set(targetPoseArray);
+        if (targetPose != null) {
+            field.getObject("shootingTargetPose").setPose(targetPose);
+        } else {
+            field.getObject("shootingTargetPose").setPose(new Pose2d());
+        }
     }
 
     public void addDrivingTargetPose(Pose2d targetPose) {
-        double[] targetPoseArray = new double[3];
-        targetPoseArray[0] = targetPose.getX();
-        targetPoseArray[1] = targetPose.getY();
-        targetPoseArray[2] = targetPose.getRotation().getDegrees();
-        drivingTargetPub.set(targetPoseArray);
+        FieldVisualizer.getInstance().updateDrivingTarget(targetPose);
     }
 
     public void publishDetectedObjects(List<Pose2d> objectPoses) {
-        double[] objectPosesArray = new double[objectPoses.size() * 3];
-        int i = 0;
-        for (Pose2d pose : objectPoses) {
-            objectPosesArray[i++] = pose.getX();
-            objectPosesArray[i++] = pose.getY();
-            objectPosesArray[i++] = pose.getRotation().getDegrees();
-        }
-        detectedObjectsPub.set(objectPosesArray);
+        FieldVisualizer.getInstance().updateDetectedObjects(objectPoses);
     }
 }

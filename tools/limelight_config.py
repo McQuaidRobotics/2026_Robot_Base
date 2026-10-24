@@ -40,7 +40,10 @@ def request(host, path, method="GET", body=None):
         req.add_header("Content-Type", "application/json")
     with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
         text = r.read().decode()
-    return json.loads(text) if text.strip() else None
+    try:
+        return json.loads(text)
+    except ValueError:
+        return text or None  # POST endpoints reply with plain text like "upload complete"
 
 
 def try_get(host, path):

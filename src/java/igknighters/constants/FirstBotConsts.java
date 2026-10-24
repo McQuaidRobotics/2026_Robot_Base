@@ -1,7 +1,9 @@
 package igknighters.constants;
 
+import igknighters.subsystems.LimeLightVision.CameraConfig;
 import igknighters.subsystems.swerve.swerveconstants.CommonSwerveConsts;
 import igknighters.subsystems.swerve.swerveconstants.SwerveConsts;
+import java.util.List;
 
 public class FirstBotConsts extends RobotConsts {
 
@@ -35,28 +37,17 @@ public class FirstBotConsts extends RobotConsts {
 
     public static class FirstBotLimelightVisionConsts implements kLimelightVisionConsts {
         @Override
-        public String primaryCam() {
-            return "limelight";
-        }
-
-        @Override
-        public String frontCam() {
-            return "limelight-intake";
-        }
-
-        @Override
-        public String backCam() {
-            return "limelight-back";
-        }
-
-        @Override
-        public String rightCam() {
-            return "limelight-left";
+        public List<CameraConfig> cameras() {
+            return List.of(
+                    new CameraConfig("limelight").throttleDisabled(0),
+                    new CameraConfig("limelight-intake").throttleDisabled(0),
+                    new CameraConfig("limelight-back").throttleDisabled(0),
+                    new CameraConfig("limelight-left").throttleDisabled(0));
         }
 
         @Override
         public boolean disableVisionLogs() {
-            return true;
+            return false;
         }
     }
 }

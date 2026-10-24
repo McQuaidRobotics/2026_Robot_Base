@@ -4,7 +4,6 @@ import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
-import edu.wpi.first.wpilibj.RobotController;
 import igknighters.Robot;
 import igknighters.util.AprilTagLayout;
 import java.io.IOException;
@@ -13,8 +12,9 @@ import java.util.List;
 import java.util.Random;
 
 /**
- * Simulates a vision subsystem by taking a ground-truth Pose2d and applying Gaussian noise and
- * random dropouts to mimic real-world camera inaccuracies.
+ * Simulates one Limelight by taking a ground-truth Pose2d, applying Gaussian noise and random
+ * dropouts, and publishing it to NetworkTables exactly like a real Limelight. Vision code then
+ * reads it through the same path it uses on the robot.
  */
 public class VisionSimulator {
     private AprilTagLayout fieldLayout;
@@ -30,13 +30,47 @@ public class VisionSimulator {
     private final double dropoutRate;
 
     private final List<Integer> visibleTagIds = new ArrayList<>();
+    private double minDistance;
+    private int heartbeat = 0;
 
     private final Random random = new Random();
+
+    // ponytail: rough FOVs of the old 4 camera layout, read real mounts from limelight-configs if
+    // sim accuracy ever matters
+    private static final double[][] FOVS = {{60, 120}, {135, 195}, {150, 210}, {240, 300}};
+
+    public static VisionSimulator forCameraIndex(int i) {
+        double[] fov = FOVS[i % FOVS.length];
+        return new VisionSimulator(fov[0], fov[1], 5, 0.0001, 0.0, 0.1);
+    }
+
+    /** Writes this frame to the Limelight's NetworkTables entries. */
+    public void publish(String limelightName) {
+        Pose2d pose = getEstimatedPose();
+        int n = pose == null ? 0 : visibleTagIds.size();
+        double[] botpose = new double[11 + 7 * n];
+        if (pose != null) {
+            botpose[0] = pose.getX();
+            botpose[1] = pose.getY();
+            botpose[5] = pose.getRotation().getDegrees();
+            botpose[7] = n;
+            botpose[9] = minDistance;
+            for (int i = 0; i < n; i++) {
+                int b = 11 + 7 * i;
+                botpose[b] = visibleTagIds.get(i);
+                botpose[b + 4] = minDistance;
+                botpose[b + 5] = minDistance;
+            }
+        }
+        LimelightHelpers.setLimelightNTDoubleArray(limelightName, "botpose_wpiblue", botpose);
+        LimelightHelpers.setLimelightNTDoubleArray(limelightName, "botpose_orb_wpiblue", botpose);
+        LimelightHelpers.setLimelightNTDouble(limelightName, "tv", n > 0 ? 1 : 0);
+        LimelightHelpers.setLimelightNTDouble(limelightName, "hb", heartbeat++);
+    }
 
     /**
      * Creates a new VisionSimulator.
      *
-     * @param jsonFilePath Path to the WPILib AprilTag JSON file.
      * @param minAngleDegrees The left-most angle the camera can see (e.g., 45).
      * @param maxAngleDegrees The right-most angle the camera can see (e.g., -45).
      * @param maxVisibleDistanceMeters Maximum range the camera can detect a tag.
@@ -79,7 +113,7 @@ public class VisionSimulator {
         }
 
         // 2. Check visibility and find the closest tag
-        double minDistance = Double.MAX_VALUE;
+        minDistance = Double.MAX_VALUE;
         boolean canSeeTag = false;
 
         for (int tag : fieldLayout.getTagPoses().keySet()) {
@@ -135,10 +169,6 @@ public class VisionSimulator {
                 truePose.getRotation().getRadians() + (random.nextGaussian() * appliedThetaStdDev);
 
         return new Pose2d(new Translation2d(fuzzedX, fuzzedY), new Rotation2d(fuzzedTheta));
-    }
-
-    public double getTime() {
-        return RobotController.getTime() / 1000000.0;
     }
 
     public List<Integer> getVisibleTagIds() {

@@ -1,6 +1,8 @@
 package igknighters.constants;
 
+import igknighters.subsystems.LimeLightVision.CameraConfig;
 import igknighters.subsystems.swerve.swerveconstants.CommonSwerveConsts;
+import java.util.List;
 
 /**
  * Per robot constants contract.
@@ -21,18 +23,11 @@ public abstract class RobotConsts {
     }
 
     /**
-     * Limelight hostnames by mounting position.
-     *
-     * <p>The returned strings must match the hostname configured on each physical Limelight.
+     * Limelights on this robot. Names must match the hostname configured on each physical
+     * Limelight.
      */
     public interface kLimelightVisionConsts {
-        String primaryCam();
-
-        String frontCam();
-
-        String backCam();
-
-        String rightCam();
+        List<CameraConfig> cameras();
 
         boolean disableVisionLogs();
     }

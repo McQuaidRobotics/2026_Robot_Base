@@ -4,7 +4,6 @@ import choreo.Choreo.TrajectoryLogger;
 import choreo.auto.AutoFactory;
 import choreo.auto.AutoTrajectory;
 import choreo.trajectory.SwerveSample;
-import com.ctre.phoenix6.Utils;
 import com.ctre.phoenix6.swerve.SwerveDrivetrain.SwerveDriveState;
 import com.ctre.phoenix6.swerve.SwerveRequest;
 import edu.wpi.first.math.Matrix;
@@ -119,9 +118,7 @@ public class Swerve extends SubsystemBase {
             Matrix<N3, N1> visionMeasurementStdDevs) {
         if (!isSwerveDisabled) {
             drivetrain.addVisionMeasurement(
-                    visionRobotPoseMeters,
-                    Utils.fpgaToCurrentTime(timestampSeconds),
-                    visionMeasurementStdDevs);
+                    visionRobotPoseMeters, timestampSeconds, visionMeasurementStdDevs);
         }
     }
 

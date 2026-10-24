@@ -9,23 +9,4 @@ package igknighters.constants;
 public class SubsystemConstants {
 
     public static final boolean disableAllLogs = false;
-
-    /**
-     * Limelight hostnames by mounting position.
-     *
-     * <p>These must match the hostname configured on each physical Limelight.
-     */
-    public static class kLimelightVision {
-        public static final String primaryCam = "limelight";
-        public static final String frontCam = "limelight-intake";
-        public static final String backCam = "limelight-back";
-        public static final String rightCam = "limelight-left";
-        public static boolean disableVisionLogs = true;
-
-        static {
-            if (disableAllLogs) {
-                disableVisionLogs = true;
-            }
-        }
-    }
 }

@@ -7,7 +7,6 @@ package igknighters;
 import choreo.auto.AutoChooser;
 import choreo.auto.AutoFactory;
 import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -62,8 +61,6 @@ public class Robot extends LoggedRobot {
     private final DriverController driverController = new DriverController(0);
 
     public final Subsystems subsystems;
-
-    private final boolean kUseLimelight = true;
 
     private Telemetry logger;
     TunableDouble detune = TunableValues.getDouble("Tunables/Detune", 1.0);
@@ -187,7 +184,8 @@ public class Robot extends LoggedRobot {
                                 System.getProperty("os.version"),
                                 System.getProperty("os.arch")));
         if (Robot.isReal()) {
-            Logger.addDataReceiver(new WPILOGWriter());
+            // roboRIO 2 SD card, no USB stick needed. Pull logs with AdvantageScope or scp.
+            Logger.addDataReceiver(new WPILOGWriter("/home/lvuser/logs"));
             Logger.addDataReceiver(new NT4Publisher());
         } else {
             Logger.addDataReceiver(new NT4Publisher());
@@ -208,10 +206,11 @@ public class Robot extends LoggedRobot {
         setUpRobotConsts();
         setUpAdvantageScope();
         setUpCommandLogging();
+        Swerve swerve = new Swerve(isSwerveDisabled);
         subsystems =
                 new Subsystems(
-                        new Swerve(isSwerveDisabled),
-                        new LimeLightVision(),
+                        swerve,
+                        new LimeLightVision(swerve, consts.limelightVision().cameras()),
                         new Led(90, 2),
                         new Luma(true, "object-detection"));
         setUpSwerve(subsystems);
@@ -230,29 +229,6 @@ public class Robot extends LoggedRobot {
         CommandScheduler.getInstance().run();
         pose_pred.setVelocitiesAndPose();
         pose_pred_error.logPose(subsystems.swerve.getState().Pose);
-
-        if (kUseLimelight) {
-            var driveState = subsystems.swerve.getState();
-            double headingDeg = driveState.Pose.getRotation().getDegrees();
-            double omegaRps = Units.radiansToRotations(driveState.Speeds.omegaRadiansPerSecond);
-            Pose2d currentPose =
-                    subsystems.vision.getRobotPoseFromVision(headingDeg, omegaRps, 0, 0, 0, 0);
-
-            if (currentPose != null) {
-                subsystems.swerve.addVisionMeasurement(
-                        currentPose,
-                        subsystems.vision
-                                .getLastTimeStamp()); // trusts vision rotation less. Needs tuning
-                // increase the std devs to trust vision less
-                if (!Robot.consts.limelightVision().disableVisionLogs()) {
-                    Log.log("ROBOT/Subsystems/Vision/Null Pose", false);
-                }
-            } else {
-                if (!Robot.consts.limelightVision().disableVisionLogs()) {
-                    Log.log("ROBOT/Subsystems/Vision/Null Pose", true);
-                }
-            }
-        }
     }
 
     public void bindDriverController() {
@@ -269,7 +245,6 @@ public class Robot extends LoggedRobot {
         DrivingSharedState.getInstance().setKP(targetingP.value());
         DrivingSharedState.getInstance().setKI(targetingI.value());
         DrivingSharedState.getInstance().setKD(targetingD.value());
-        subsystems.vision.disableCameras();
 
         bindDriverController();
     }
@@ -278,13 +253,10 @@ public class Robot extends LoggedRobot {
     public void disabledPeriodic() {}
 
     @Override
-    public void disabledExit() {
-        subsystems.vision.enableCameras(0);
-    }
+    public void disabledExit() {}
 
     @Override
     public void autonomousInit() {
-        subsystems.vision.enableCameras(0);
         Command autoCommand = autoChooser.selectedCommand();
         m_autonomousCommand = autoCommand;
         if (autoCommand != null) {
@@ -303,7 +275,6 @@ public class Robot extends LoggedRobot {
 
     @Override
     public void teleopInit() {
-        subsystems.vision.enableCameras(0);
         subsystems.swerve.clearActiveTrajectory();
         scheduler.cancelAll();
         if (m_autonomousCommand != null) {

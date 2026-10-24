@@ -27,6 +27,21 @@ public class CameraConfig {
     /** Ignore frames whose average tag distance is farther than this (meters). */
     public double maxTagDistance = 5.0;
 
+    /** MegaTag1 heading is only trusted when every tag's ambiguity is below this. */
+    public double maxAmbiguity = 0.3;
+
+    /** MT1 vs MT2 translation gap (meters) that means our heading is wrong. */
+    public double maxMt1Mt2Disagreement = 1.0;
+
+    /** Most an agreeing frame's MegaTag1 heading may move the robot heading (degrees). */
+    public double maxHeadingCorrectionDeg = 30;
+
+    /**
+     * MegaTag1 must hold the same offset from our heading (within 5 degrees) this long before it
+     * may reset a wrong heading (seconds). Works while turning, only flips break it.
+     */
+    public double headingResetStableSeconds = 1.0;
+
     public int imuModeEnabled = 0;
     public int imuModeDisabled = 1;
 
@@ -57,6 +72,26 @@ public class CameraConfig {
 
     public CameraConfig maxTagDistance(double v) {
         maxTagDistance = v;
+        return this;
+    }
+
+    public CameraConfig maxAmbiguity(double v) {
+        maxAmbiguity = v;
+        return this;
+    }
+
+    public CameraConfig maxMt1Mt2Disagreement(double v) {
+        maxMt1Mt2Disagreement = v;
+        return this;
+    }
+
+    public CameraConfig maxHeadingCorrectionDeg(double v) {
+        maxHeadingCorrectionDeg = v;
+        return this;
+    }
+
+    public CameraConfig headingResetStableSeconds(double v) {
+        headingResetStableSeconds = v;
         return this;
     }
 

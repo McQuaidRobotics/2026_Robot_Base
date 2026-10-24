@@ -39,10 +39,10 @@ public class FirstBotConsts extends RobotConsts {
         @Override
         public List<CameraConfig> cameras() {
             return List.of(
-                    new CameraConfig("limelight").throttleDisabled(0),
-                    new CameraConfig("limelight-intake").throttleDisabled(0),
+                    new CameraConfig("limelight"),
+                    new CameraConfig("limelight-intake"),
                     new CameraConfig("limelight-back").throttleDisabled(0),
-                    new CameraConfig("limelight-left").throttleDisabled(0));
+                    new CameraConfig("limelight-left"));
         }
 
         @Override

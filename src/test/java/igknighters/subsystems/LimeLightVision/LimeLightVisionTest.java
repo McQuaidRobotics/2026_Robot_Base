@@ -108,4 +108,21 @@ class LimeLightVisionTest {
         var flipB = LimeLightVision.headingGap(est(5, 4, 0, 2, 1, 0), est(5, 4, -98, 2, 1, 0));
         assertTrue(Math.abs(flipA.minus(flipB).getDegrees()) > 5);
     }
+
+    /**
+     * Seen on the robot: one tag (id 2) held a steady 87 degree gap for 9 s. That may reset
+     * heading.
+     */
+    @Test
+    void singleStableTagCanResetHeadingButNotNudge() {
+        var mt2 = est(12, 7.5, 0, 1, 1.5, 0.1); // gyro wrong, so MT2 lands far from MT1
+        var mt1 = est(12.2, 5.6, 87, 1, 1.5, 0.1);
+        assertEquals("MT1/MT2 disagree", rejectReason(cfg, mt2, mt1, 0, 0.3));
+        assertNull(rejectReason(cfg, mt2, mt1, 0, 1.0));
+        assertEquals(87, measure(cfg, mt2, mt1).pose().getRotation().getDegrees(), 1e-9);
+
+        // agreeing single tag frame: no per-frame nudge
+        var m = measure(cfg, est(12, 5.5, 0, 1, 1.5, 0.1), est(12.1, 5.5, 10, 1, 1.5, 0.1));
+        assertEquals(NO_TRUST, m.stdDevs().get(2, 0));
+    }
 }

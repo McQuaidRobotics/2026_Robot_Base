@@ -50,6 +50,14 @@ public class LimeLightVision extends SubsystemBase {
     private static final double DISCONNECT_SECONDS = 0.5;
     private static final double HEADING_STABLE_DEG = 5;
 
+    /**
+     * A single tag may reset heading because the reset also needs a 1 s stable gap (one tag held 9
+     * s within 5 degrees on the robot). Per-frame nudges have no such check, so they need 2 tags.
+     */
+    private static final int RESET_MIN_TAGS = 1;
+
+    private static final int NUDGE_MIN_TAGS = 2;
+
     private static class Cam {
         final Limelight ll;
         final CameraConfig cfg;
@@ -172,7 +180,7 @@ public class LimeLightVision extends SubsystemBase {
             cam.lastFrameTimestamp = mt2.timestampSeconds;
 
             PoseEstimate mt1 = cam.ll.getMegaTag1();
-            if (!mt1Trusted(cam.cfg, mt2, mt1)) {
+            if (!mt1Trusted(cam.cfg, mt2, mt1, RESET_MIN_TAGS)) {
                 cam.mt1StableSince = -1;
             } else if (cam.mt1StableSince < 0
                     || Math.abs(headingGap(mt2, mt1).minus(cam.mt1StableGap).getDegrees())
@@ -232,7 +240,7 @@ public class LimeLightVision extends SubsystemBase {
             // (or MegaTag2 failed, which reports field center). Only a trusted MT1 can fix heading,
             // and coplanar tags make MT1 flip between two headings, so it must hold one first.
             boolean resetOk =
-                    mt1Trusted(cfg, mt2, mt1)
+                    mt1Trusted(cfg, mt2, mt1, RESET_MIN_TAGS)
                             && mt1StableSeconds >= cfg.headingResetStableSeconds
                             && !offField(mt1.pose);
             return resetOk ? null : "MT1/MT2 disagree";
@@ -254,7 +262,7 @@ public class LimeLightVision extends SubsystemBase {
         boolean disagree = disagree(cfg, mt2, mt1);
         double correction = mt1.pose.getRotation().minus(mt2.pose.getRotation()).getDegrees();
         // Agreeing frames may only nudge heading. Big changes go through the stable reset path.
-        if (mt1Trusted(cfg, mt2, mt1)
+        if (mt1Trusted(cfg, mt2, mt1, disagree ? RESET_MIN_TAGS : NUDGE_MIN_TAGS)
                 && (disagree || Math.abs(correction) <= cfg.maxHeadingCorrectionDeg)) {
             double d1 = Math.max(mt1.avgTagDist, 0.5);
             theta = cfg.thetaStdDevCoeff * d1 * d1 / mt1.tagCount;
@@ -295,10 +303,13 @@ public class LimeLightVision extends SubsystemBase {
                         > cfg.maxMt1Mt2Disagreement;
     }
 
-    /** 2+ tags, every one unambiguous. Coplanar tags can still flip between two solutions. */
-    static boolean mt1Trusted(CameraConfig cfg, PoseEstimate mt2, PoseEstimate mt1) {
+    /**
+     * Enough tags, every one unambiguous. Ambiguity alone does not catch flips (seen on the robot),
+     * which is why resets also need a stable heading gap and nudges are capped.
+     */
+    static boolean mt1Trusted(CameraConfig cfg, PoseEstimate mt2, PoseEstimate mt1, int minTags) {
         return sameFrame(mt2, mt1)
-                && mt1.tagCount >= 2
+                && mt1.tagCount >= minTags
                 && mt1.rawFiducials.length == mt1.tagCount
                 && maxAmbiguity(mt1) < cfg.maxAmbiguity;
     }

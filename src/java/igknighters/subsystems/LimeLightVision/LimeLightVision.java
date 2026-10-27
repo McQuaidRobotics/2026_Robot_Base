@@ -16,7 +16,7 @@ import igknighters.Robot;
 import igknighters.constants.FieldConstants;
 import igknighters.subsystems.LimeLightVision.Helpers.LimelightHelpers;
 import igknighters.subsystems.LimeLightVision.Helpers.LimelightHelpers.PoseEstimate;
-import igknighters.subsystems.LimeLightVision.Helpers.VisionSimulator;
+import igknighters.subsystems.LimeLightVision.Sim.LimelightSim;
 import igknighters.subsystems.swerve.Swerve;
 import igknighters.util.log.Log;
 import java.util.ArrayList;
@@ -62,7 +62,7 @@ public class LimeLightVision extends SubsystemBase {
         final Limelight ll;
         final CameraConfig cfg;
         final Alert disconnected;
-        VisionSimulator sim;
+        LimelightSim sim;
         double lastFrameTimestamp = -1;
         double lastHeartbeat = -1;
         double lastHeartbeatChange = 0;
@@ -70,7 +70,11 @@ public class LimeLightVision extends SubsystemBase {
         /** When MT1 started holding its current heading, -1 if it is not trusted right now. */
         double mt1StableSince = -1;
 
-        Rotation2d mt1StableGap = Rotation2d.kZero;
+        Rotation2d mt1StableGap =
+                Rotation2d.kZero; // this is if the gyro is a consistent amount out of sync with
+
+        // camera which means that the camera is holding a consistent gap
+        // with the gyro so something is wrong with gyro eg zeroed wrong
 
         Cam(CameraConfig cfg) {
             this.cfg = cfg;
@@ -82,6 +86,10 @@ public class LimeLightVision extends SubsystemBase {
 
     private final Swerve swerve;
     private final List<Cam> cams = new ArrayList<>();
+    private final Map<String, Integer> cameraErrorCounts =
+            new HashMap<>(); // this will help track if a camera is consistently off. This is
+    // especially important because when the algorithim is bulletproofed
+    // the bad measurements will be droped giving no indication of errors
     private final Map<String, Limelight> byName = new HashMap<>();
     private final List<Integer> visibleTagIds = new ArrayList<>();
     private final List<Measurement> accepted = new ArrayList<>();
@@ -96,7 +104,7 @@ public class LimeLightVision extends SubsystemBase {
         }
         if (Robot.isSimulation()) {
             for (int i = 0; i < cams.size(); i++) {
-                cams.get(i).sim = VisionSimulator.forCameraIndex(i);
+                cams.get(i).sim = new LimelightSim(cams.get(i).cfg.name);
             }
         }
     }
@@ -129,8 +137,13 @@ public class LimeLightVision extends SubsystemBase {
         double yawDeg = state.Pose.getRotation().getDegrees();
         double yawRateDps = Math.toDegrees(state.Speeds.omegaRadiansPerSecond);
 
+        // above is simply data gathering for the below math
+
         boolean disabled = DriverStation.isDisabled();
-        if (wasDisabled == null || wasDisabled != disabled) {
+        if (wasDisabled == null
+                || wasDisabled
+                        != disabled) { // automatically enable and disable the vision system to not
+            // overheat the cameras
             wasDisabled = disabled;
             for (Cam cam : cams) {
                 cam.ll.setThrottle(disabled ? cam.cfg.throttleDisabled : 0);
@@ -139,7 +152,13 @@ public class LimeLightVision extends SubsystemBase {
         }
 
         for (Cam cam : cams) {
-            if (cam.cfg.mount != null) {
+            if (cam.cfg.mount
+                    != null) { // if the camera has a moving position this will set the limelights
+                // orientation in space
+                // warning! From my expierience when you use this method it overwrites the values
+                // held in gui.
+                // I have not fully verified it but if you are doing any kind of testing with
+                // turreted cameras please save the settings
                 Pose3d m = cam.cfg.mount.get();
                 cam.ll.setCameraPoseRobotSpace(
                         m.getX(),
@@ -154,37 +173,53 @@ public class LimeLightVision extends SubsystemBase {
         LimelightHelpers.Flush();
 
         boolean log = !Robot.consts.limelightVision().disableVisionLogs();
-        visibleTagIds.clear();
+        visibleTagIds.clear(); // dont make the list infinite and hold from previous runs
         accepted.clear();
         for (Cam cam : cams) {
             String path = "Vision/" + cam.cfg.name + "/";
 
             double hb = cam.ll.getHeartbeat();
-            if (hb != cam.lastHeartbeat) {
+            if (hb != cam.lastHeartbeat) { // the camera has processed a new frame since the last
+                // robot loop
                 cam.lastHeartbeat = hb;
                 cam.lastHeartbeatChange = now;
             }
-            boolean connected = now - cam.lastHeartbeatChange < DISCONNECT_SECONDS;
-            cam.disconnected.set(!connected);
+            boolean connected =
+                    now - cam.lastHeartbeatChange
+                            < DISCONNECT_SECONDS; // the camera is connected if it has sent a frame
+            // recently
+            cam.disconnected.set(!connected); // an alert that will notify ds that cam disconected
             if (!connected) {
-                continue; // NetworkTables keeps the last values forever, do not trust them
+                continue; // NetworkTables keeps the last values forever, do not trust them or else
+                // it will keep sending pose from when turned off
             }
 
             PoseEstimate mt2 = cam.ll.getMegaTag2();
             for (var f : mt2.rawFiducials) {
-                visibleTagIds.add(f.id);
+                visibleTagIds.add(
+                        f.id); // these are just what do i see no gating as to whether they are good
+                // or not
             }
             if (!cam.cfg.localize || mt2.timestampSeconds == cam.lastFrameTimestamp) {
                 continue; // same frame as last loop, the estimator already has it
             }
             cam.lastFrameTimestamp = mt2.timestampSeconds;
 
-            PoseEstimate mt1 = cam.ll.getMegaTag1();
-            if (!mt1Trusted(cam.cfg, mt2, mt1, RESET_MIN_TAGS)) {
-                cam.mt1StableSince = -1;
+            PoseEstimate mt1 =
+                    cam.ll.getMegaTag1(); // we use this so we can fuse the two estimators and its
+            // cheap to get because its no more math
+            if (!mt1Trusted(
+                    cam.cfg,
+                    mt2,
+                    mt1,
+                    RESET_MIN_TAGS)) { // the MT1 estimate is not trusted see java docs for
+                // exclusion reasons
+                cam.mt1StableSince = -1; // -1 means not trusted
             } else if (cam.mt1StableSince < 0
                     || Math.abs(headingGap(mt2, mt1).minus(cam.mt1StableGap).getDegrees())
-                            > HEADING_STABLE_DEG) {
+                            > HEADING_STABLE_DEG) { // the estimate is valid and the gap and
+                // timestamp are set nothing will change unless
+                // it has been stable for a while
                 cam.mt1StableSince = mt1.timestampSeconds;
                 cam.mt1StableGap = headingGap(mt2, mt1);
             }
@@ -197,7 +232,9 @@ public class LimeLightVision extends SubsystemBase {
                 Log.log(path + "MT2", mt2.pose);
                 Log.log(path + "MaxAmbiguity", maxAmbiguity(mt1));
             }
-            if (reason != null) {
+            if (reason
+                    != null) { // null means all good anything else means something wrong with frame
+                // so no math gets done on it
                 continue;
             }
 
@@ -219,7 +256,7 @@ public class LimeLightVision extends SubsystemBase {
     @Override
     public void simulationPeriodic() {
         for (Cam cam : cams) {
-            cam.sim.publish(cam.cfg.name);
+            cam.sim.update(swerve.getState().Pose);
         }
     }
 
@@ -259,8 +296,12 @@ public class LimeLightVision extends SubsystemBase {
     static Measurement measure(CameraConfig cfg, PoseEstimate mt2, PoseEstimate mt1) {
         double theta = NO_TRUST;
         var rotation = mt2.pose.getRotation();
-        boolean disagree = disagree(cfg, mt2, mt1);
-        double correction = mt1.pose.getRotation().minus(mt2.pose.getRotation()).getDegrees();
+        boolean disagree = disagree(cfg, mt2, mt1); // distances dont match or frames dont match
+        double correction =
+                mt1.pose
+                        .getRotation()
+                        .minus(mt2.pose.getRotation())
+                        .getDegrees(); // error between two estimates
         // Agreeing frames may only nudge heading. Big changes go through the stable reset path.
         if (mt1Trusted(cfg, mt2, mt1, disagree ? RESET_MIN_TAGS : NUDGE_MIN_TAGS)
                 && (disagree || Math.abs(correction) <= cfg.maxHeadingCorrectionDeg)) {
@@ -308,10 +349,10 @@ public class LimeLightVision extends SubsystemBase {
      * which is why resets also need a stable heading gap and nudges are capped.
      */
     static boolean mt1Trusted(CameraConfig cfg, PoseEstimate mt2, PoseEstimate mt1, int minTags) {
-        return sameFrame(mt2, mt1)
-                && mt1.tagCount >= minTags
+        return sameFrame(mt2, mt1) // the timestamps match
+                && mt1.tagCount >= minTags // enough tags to even consider mt1 unstable at like 1
                 && mt1.rawFiducials.length == mt1.tagCount
-                && maxAmbiguity(mt1) < cfg.maxAmbiguity;
+                && maxAmbiguity(mt1) < cfg.maxAmbiguity; // every tag in the estimate is unambiguous
     }
 
     static double maxAmbiguity(PoseEstimate est) {

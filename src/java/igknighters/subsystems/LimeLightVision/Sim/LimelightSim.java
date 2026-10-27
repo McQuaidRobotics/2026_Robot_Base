@@ -1,6 +1,5 @@
 package igknighters.subsystems.LimeLightVision.Sim;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.wpi.first.apriltag.AprilTag;
 import edu.wpi.first.apriltag.AprilTagFieldLayout;
 import edu.wpi.first.apriltag.AprilTagFields;
@@ -10,69 +9,33 @@ import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Transform3d;
 import edu.wpi.first.math.geometry.Translation3d;
+import edu.wpi.first.math.interpolation.TimeInterpolatableBuffer;
 import edu.wpi.first.networktables.DoubleArrayEntry;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.Timer;
-import igknighters.subsystems.LimeLightVision.Sim.SimUtils.networktables.LimelightResults;
-import igknighters.subsystems.LimeLightVision.Sim.SimUtils.networktables.LimelightUtils;
-import igknighters.subsystems.LimeLightVision.Sim.SimUtils.networktables.target.AprilTagFiducial;
+import igknighters.subsystems.LimeLightVision.Helpers.LimelightHelpers;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 
-// CREDIT GOES TO YALL Library I copied and modified the simulator to fit team 3173
+// Credit: copied and trimmed from the YALL library's LimelightSim (which credits PhotonVision's
+// VisionSystemSim for the design).
 /**
- * Simulates a {@link Limelight} running the AprilTag/fiducial pipeline, publishing to the same
- * NetworkTables keys a real Limelight would populate ("tx", "ty", "ta", "tv", "tid", "botpose*",
- * "rawfiducials", "t2d", "targetpose_*"/"camerapose_*"/"botpose_targetspace",
- * "tl"/"cl"/"getpipe"/"getpipetype", "json", ...) so that code written against {@link
- * limelight.networktables.LimelightData}, {@link limelight.networktables.LimelightTargetData} and
- * {@link limelight.networktables.LimelightPoseEstimator} behaves the same in simulation as on real
- * hardware.
+ * Simulates one Limelight on the AprilTag pipeline by publishing the same NetworkTables keys a real
+ * one does (botpose*, rawfiducials, tx/ty/ta/tv/tid, t2d, hb, stddevs, imu, ...), so robot code
+ * runs unchanged in sim. Fed the TRUE robot pose every loop.
  *
- * <p>Minimal usage:
- *
- * <pre>{@code
- * Limelight limelight = new Limelight("limelight");
- * LimelightSim limelightSim = new LimelightSim(limelight);
- *
- * // Optional Field2d visualization:
- * limelightSim.withField2d(field);
- *
- * // in Robot#simulationPeriodic()
- * limelightSim.update(drivebase.getPose());
- * }</pre>
- *
- * By default the current season's official AprilTag field is used and the camera is assumed to be
- * mounted at the robot's origin. Call {@link #withRobotToCameraTransform(Transform3d)} and/or
- * {@link #withSettings(LimelightSimSettings)} to refine it.
- *
- * <p>The overall approach (a per camera simulation object that is fed the ground truth robot pose
- * every loop and projects field targets into a simple pinhole camera model to publish simulated
- * NetworkTables output) is modeled after PhotonVision's {@code VisionSystemSim}/{@code
- * PhotonCameraSim} simulation classes. Credit to the PhotonVision project for that design; this
- * implementation is a from scratch, self contained port of the idea onto the Limelight
- * NetworkTables schema and does not depend on PhotonVision at runtime.
- *
- * <p>
- *
- * @implNote Only the fiducial/AprilTag pipeline is simulated (retroreflective, neural
- *     classifier/detector and barcode pipelines are not). Robot pose and tag geometry are known
- *     exactly by the simulator, so rather than re-deriving a pose estimate via solvePnP like the
- *     real Limelight firmware does, the published botpose values are the ground truth robot pose
- *     with configurable Gaussian noise applied. This is an approximation, not a physically derived
- *     uncertainty model.
+ * <p>Poses are ground truth plus Gaussian noise, not a real solvePnP, so the real failure modes
+ * (MT1 flips, MT2 reporting field center, high ambiguity) only appear via fault injection. The
+ * "json" results entry is not published, so getLatestResults() is empty in sim.
  */
 public class LimelightSim {
 
-    /** {@link Limelight} being simulated. */
-    private final String limelightName;
-
-    /** {@link NetworkTable} for the {@link Limelight} being simulated. */
+    /** NetworkTable of the Limelight being simulated. */
     private final NetworkTable table;
 
     /** Deterministic noise source. */
@@ -87,14 +50,12 @@ public class LimelightSim {
     /** AprilTag field layout used to source simulated targets. */
     private AprilTagFieldLayout fieldLayout;
 
-    /** Jackson mapper used to publish the "json" results entry. */
-    private final ObjectMapper jsonMapper = new ObjectMapper();
+    /** Recent true poses, so a frame reports where the robot was when it was captured. */
+    private final TimeInterpolatableBuffer<Pose2d> truthHistory =
+            TimeInterpolatableBuffer.createBuffer(1.0);
 
-    /** Heartbeat counter, incremented once per {@link #update(Pose3d)} call. */
+    /** Heartbeat counter, incremented once per published frame. */
     private long heartbeat = 0;
-
-    /** Frame index counter, incremented once per {@link #update(Pose3d)} call. */
-    private long frameIndex = 0;
 
     private final NetworkTableEntry tvEntry;
     private final NetworkTableEntry txEntry;
@@ -109,7 +70,6 @@ public class LimelightSim {
     private final NetworkTableEntry hbEntry;
     private final NetworkTableEntry getpipeEntry;
     private final NetworkTableEntry getpipetypeEntry;
-    private final NetworkTableEntry jsonEntry;
     private final NetworkTableEntry pipelineIndexEntry;
     private final DoubleArrayEntry t2dEntry;
     private final DoubleArrayEntry rawFiducialsEntry;
@@ -129,23 +89,17 @@ public class LimelightSim {
     private final DoubleArrayEntry robotOrientationSetEntry;
 
     /**
-     * Construct a {@link LimelightSim} for the given {@link Limelight} using default camera
-     * settings, the current season's AprilTag field layout and no robot-to-camera offset.
-     *
-     * @param limelight {@link Limelight} to simulate.
+     * @param limelight Limelight name (NetworkTables table) to publish as.
+     * @param robotToCamera Camera mount, see {@code CameraConfig.simMount}.
      */
-    public LimelightSim(String limelight) {
-        this(limelight, new LimelightSimSettings());
+    public LimelightSim(String limelight, Transform3d robotToCamera) {
+        // Seed per camera: one shared seed made every camera publish identical noise, which the
+        // estimator then counted as independent confirmations.
+        this(limelight, new LimelightSimSettings().withRandomSeed(limelight.hashCode()));
+        this.robotToCamera = robotToCamera;
     }
 
-    /**
-     * Construct a {@link LimelightSim} for the given {@link Limelight}.
-     *
-     * @param limelight {@link Limelight} to simulate.
-     * @param settings Camera settings to use.
-     */
     public LimelightSim(String limelight, LimelightSimSettings settings) {
-        this.limelightName = limelight;
         this.table = NetworkTableInstance.getDefault().getTable(limelight);
         this.settings = settings;
         this.noise = new Random(settings.randomSeed);
@@ -164,7 +118,6 @@ public class LimelightSim {
         hbEntry = table.getEntry("hb");
         getpipeEntry = table.getEntry("getpipe");
         getpipetypeEntry = table.getEntry("getpipetype");
-        jsonEntry = table.getEntry("json");
         pipelineIndexEntry = table.getEntry("pipeline");
         t2dEntry = table.getDoubleArrayTopic("t2d").getEntry(new double[0]);
         rawFiducialsEntry = table.getDoubleArrayTopic("rawfiducials").getEntry(new double[0]);
@@ -193,67 +146,28 @@ public class LimelightSim {
     }
 
     /**
-     * Set the transform from the robot's origin to the camera's lens. Equivalent in effect to
-     * {@link limelight.networktables.LimelightSettings#withCameraOffset(Pose3d)} on real hardware.
-     *
-     * @param robotToCamera Transform from the robot origin to the camera.
-     * @return {@link LimelightSim} for chaining.
-     */
-    public LimelightSim withRobotToCameraTransform(Transform3d robotToCamera) {
-        this.robotToCamera = robotToCamera;
-        return this;
-    }
-
-    /**
-     * Override the AprilTag field layout used to source simulated targets. Defaults to the current
-     * season's official field.
-     *
-     * @param fieldLayout {@link AprilTagFieldLayout} to use.
-     * @return {@link LimelightSim} for chaining.
-     */
-    public LimelightSim withAprilTagFieldLayout(AprilTagFieldLayout fieldLayout) {
-        this.fieldLayout = fieldLayout;
-        return this;
-    }
-
-    /**
-     * Set the camera properties/noise/latency configuration.
-     *
-     * @param settings {@link LimelightSimSettings} to use.
-     * @return {@link LimelightSim} for chaining.
-     */
-    public LimelightSim withSettings(LimelightSimSettings settings) {
-        this.settings = settings;
-        this.noise = new Random(settings.randomSeed);
-        return this;
-    }
-
-    /**
-     * Update the simulated {@link Limelight} with the robot's current pose, projecting visible
-     * AprilTags and publishing the resulting NetworkTables data. Call this periodically, typically
-     * from {@code Robot#simulationPeriodic()}.
-     *
-     * <p>No-op if not running in simulation.
-     *
-     * @param robotPoseMeters Ground-truth robot pose, in meters.
+     * Publish one simulated frame. Call every loop from simulationPeriodic with the TRUE robot pose
+     * (never the estimator's pose, that feeds vision noise back into itself).
      */
     public void update(Pose2d robotPoseMeters) {
-        update(new Pose3d(robotPoseMeters));
-    }
-
-    /**
-     * Update the simulated {@link Limelight} with the robot's current pose, projecting visible
-     * AprilTags and publishing the resulting NetworkTables data. Call this periodically, typically
-     * from {@code Robot#simulationPeriodic()}.
-     *
-     * <p>No-op if not running in simulation.
-     *
-     * @param robotPose Ground-truth robot pose, in meters.
-     */
-    public void update(Pose3d robotPose) {
         if (!RobotBase.isSimulation()) {
             return;
         }
+        double now = Timer.getFPGATimestamp();
+        truthHistory.addSample(now, robotPoseMeters);
+        double tlMs =
+                Math.max(
+                        0,
+                        settings.avgPipelineLatencyMs
+                                + noise.nextGaussian() * settings.latencyStdDevMs);
+        // Limelight timestamps a frame as (publish time - latency), so publish the pose from then
+        double latencySeconds = (tlMs + settings.avgCaptureLatencyMs) / 1000.0;
+        Pose2d atCapture = truthHistory.getSample(now - latencySeconds).orElse(robotPoseMeters);
+        publish(new Pose3d(atCapture), tlMs);
+    }
+
+    /** Project visible tags from {@code robotPose} and publish one frame. */
+    private void publish(Pose3d robotPose, double tlMs) {
 
         Pose3d cameraPose = robotPose.plus(robotToCamera);
 
@@ -293,12 +207,6 @@ public class LimelightSim {
                                         .getDistance(visible.get(j).pose.getTranslation()));
             }
         }
-
-        double tlMs =
-                Math.max(
-                        0,
-                        settings.avgPipelineLatencyMs
-                                + noise.nextGaussian() * settings.latencyStdDevMs);
 
         double clMs = settings.avgCaptureLatencyMs;
         double totalLatencyMs = tlMs + clMs;
@@ -354,23 +262,7 @@ public class LimelightSim {
                 mt2Pose,
                 mt2PoseRed);
 
-        publishJson(
-                robotPose,
-                cameraPose,
-                visible,
-                tagCount,
-                tagSpan,
-                avgTagDist,
-                avgTagArea,
-                tlMs,
-                clMs,
-                primary,
-                mt1Pose,
-                mt1PoseRed,
-                mt2Pose);
-
         heartbeat++;
-        frameIndex++;
     }
 
     /** Publish the scalar ("primary target") NT entries. */
@@ -519,15 +411,15 @@ public class LimelightSim {
             Pose3d tagPose = primary.pose;
 
             targetPoseRobotSpaceEntry.set(
-                    LimelightUtils.pose3dToArray(tagPose.relativeTo(robotPose)));
+                    LimelightHelpers.pose3dToArray(tagPose.relativeTo(robotPose)));
 
             targetPoseCameraSpaceEntry.set(
-                    LimelightUtils.pose3dToArray(tagPose.relativeTo(cameraPose)));
+                    LimelightHelpers.pose3dToArray(tagPose.relativeTo(cameraPose)));
 
             cameraPoseTargetSpaceEntry.set(
-                    LimelightUtils.pose3dToArray(cameraPose.relativeTo(tagPose)));
+                    LimelightHelpers.pose3dToArray(cameraPose.relativeTo(tagPose)));
             botPoseTargetSpaceEntry.set(
-                    LimelightUtils.pose3dToArray(robotPose.relativeTo(tagPose)));
+                    LimelightHelpers.pose3dToArray(robotPose.relativeTo(tagPose)));
         } else {
             targetPoseRobotSpaceEntry.set(new double[0]);
             targetPoseCameraSpaceEntry.set(new double[0]);
@@ -536,7 +428,7 @@ public class LimelightSim {
         }
 
         cameraPoseRobotSpaceEntry.set(
-                LimelightUtils.pose3dToArray(
+                LimelightHelpers.pose3dToArray(
                         new Pose3d(robotToCamera.getTranslation(), robotToCamera.getRotation())));
 
         stddevsEntry.set(
@@ -565,92 +457,6 @@ public class LimelightSim {
                 });
     }
 
-    /** Build the JSON "json" results entry. */
-    private void publishJson(
-            Pose3d robotPose,
-            Pose3d cameraPose,
-            List<TagObservation> visible,
-            int tagCount,
-            double tagSpan,
-            double avgTagDist,
-            double avgTagArea,
-            double tlMs,
-            double clMs,
-            TagObservation primary,
-            Pose3d mt1Pose,
-            Pose3d mt1PoseRed,
-            Pose3d mt2Pose) {
-        double nowSeconds = Timer.getFPGATimestamp();
-
-        LimelightResults results = new LimelightResults();
-
-        results.error = "";
-        results.tx = primary != null ? primary.tx : 0;
-        results.ty = primary != null ? primary.ty : 0;
-        results.txnc = results.tx;
-        results.tync = results.ty;
-        results.ta = primary != null ? primary.ta : 0;
-        results.pipelineID = pipelineIndexEntry.getDouble(0);
-        results.pipeline_type = settings.pipelineType;
-        results.latency_pipeline = tlMs;
-        results.latency_capture = clMs;
-        results.timestamp_LIMELIGHT_publish = nowSeconds * 1000.0;
-        results.timestamp_RIOFPGA_capture = nowSeconds * 1000.0;
-        results.timestamp_NT = nowSeconds * 1_000_000.0;
-        results.timestamp_System = System.currentTimeMillis() * 1000.0;
-        results.frame_index = frameIndex;
-        results.valid = tagCount > 0;
-        results.botpose = LimelightUtils.pose3dToArray(mt1Pose);
-        results.botpose_wpiblue = LimelightUtils.pose3dToArray(mt1Pose);
-        results.botpose_wpired = LimelightUtils.pose3dToArray(mt1PoseRed);
-        results.botpose_mt2 = LimelightUtils.pose3dToArray(mt2Pose);
-        results.botpose_mt2_blue = LimelightUtils.pose3dToArray(mt2Pose);
-        results.botpose_tagcount = tagCount;
-        results.botpose_span = tagSpan;
-        results.botpose_avgdist = avgTagDist;
-        results.botpose_avgarea = avgTagArea;
-
-        results.camerapose_robotspace =
-                LimelightUtils.pose3dToArray(
-                        new Pose3d(robotToCamera.getTranslation(), robotToCamera.getRotation()));
-
-        results.targetDistance = primary != null ? primary.distToCamera : 0;
-
-        results.hardwareType = "sim";
-
-        AprilTagFiducial[] fiducials = new AprilTagFiducial[visible.size()];
-
-        for (int i = 0; i < visible.size(); i++) {
-            TagObservation obs = visible.get(i);
-
-            fiducials[i] =
-                    new AprilTagFiducial(
-                            obs.id,
-                            "36h11",
-                            obs.ta,
-                            obs.tx,
-                            obs.ty,
-                            obs.tx * obs.pixelsPerDegree,
-                            obs.ty * obs.pixelsPerDegree,
-                            obs.tx,
-                            obs.ty,
-                            nowSeconds * 1000.0,
-                            LimelightUtils.pose3dToArray(cameraPose.relativeTo(obs.pose)),
-                            LimelightUtils.pose3dToArray(robotPose),
-                            LimelightUtils.pose3dToArray(robotPose.relativeTo(obs.pose)),
-                            LimelightUtils.pose3dToArray(obs.pose.relativeTo(cameraPose)),
-                            LimelightUtils.pose3dToArray(obs.pose.relativeTo(robotPose)));
-        }
-
-        results.targets_Fiducials = fiducials;
-
-        try {
-            jsonEntry.setString(jsonMapper.writeValueAsString(results));
-        } catch (Exception e) {
-            jsonEntry.setString("");
-        }
-    }
-
     /**
      * Build the flat "botpose*" NT array: [x,y,z,roll,pitch,yaw, latency, tagCount, tagSpan,
      * avgDist, avgArea, (id,txnc,tync,ta,distToCamera,distToRobot,ambiguity)*tagCount].
@@ -667,7 +473,7 @@ public class LimelightSim {
             return new double[0];
         }
 
-        double[] pose6 = LimelightUtils.pose3dToArray(pose);
+        double[] pose6 = LimelightHelpers.pose3dToArray(pose);
         double[] result = new double[11 + rawFiducials.length];
 
         System.arraycopy(pose6, 0, result, 0, 6);
@@ -792,8 +598,6 @@ public class LimelightSim {
         double ambiguity =
                 MathUtil.clamp(noise.nextDouble() * 0.05 + (incidenceDeg / 90.0) * 0.15, 0, 1);
 
-        double pixelsPerDegree = (settings.resolutionWidth / 2.0) / halfHFovDeg;
-
         return Optional.of(
                 new TagObservation(
                         tag.ID,
@@ -804,8 +608,7 @@ public class LimelightSim {
                         distance,
                         distToRobot,
                         ambiguity,
-                        apparentWidthPx,
-                        pixelsPerDegree));
+                        apparentWidthPx));
     }
 
     /** A single simulated tag detection. */
@@ -820,7 +623,6 @@ public class LimelightSim {
         final double distToRobot;
         final double ambiguity;
         final double apparentWidthPixels;
-        final double pixelsPerDegree;
 
         TagObservation(
                 int id,
@@ -831,8 +633,7 @@ public class LimelightSim {
                 double distToCamera,
                 double distToRobot,
                 double ambiguity,
-                double apparentWidthPixels,
-                double pixelsPerDegree) {
+                double apparentWidthPixels) {
             this.id = id;
             this.pose = pose;
             this.ta = ta;
@@ -842,7 +643,6 @@ public class LimelightSim {
             this.distToRobot = distToRobot;
             this.ambiguity = ambiguity;
             this.apparentWidthPixels = apparentWidthPixels;
-            this.pixelsPerDegree = pixelsPerDegree;
         }
     }
 }

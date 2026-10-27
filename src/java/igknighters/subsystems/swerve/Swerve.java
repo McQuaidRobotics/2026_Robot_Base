@@ -8,6 +8,7 @@ import com.ctre.phoenix6.swerve.SwerveDrivetrain.SwerveDriveState;
 import com.ctre.phoenix6.swerve.SwerveRequest;
 import edu.wpi.first.math.Matrix;
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Twist2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
@@ -28,6 +29,14 @@ public class Swerve extends SubsystemBase {
     boolean isSwerveDisabled = false;
     DummySwerve dummySwerve = new DummySwerve();
 
+    /**
+     * Sim only: where the robot really is. Driven by the simulated wheels and never by vision, so
+     * the vision sim can be fed truth instead of our own estimate (which made a feedback loop).
+     */
+    private Pose2d simTruthPose = Pose2d.kZero;
+
+    private double lastSimTruthTime = -1;
+
     public Swerve() {
         this(false);
     }
@@ -44,6 +53,9 @@ public class Swerve extends SubsystemBase {
     public void periodic() {
         if (!isSwerveDisabled) {
             drivetrain.periodic();
+            if (Robot.isSimulation()) {
+                updateSimTruthPose();
+            }
             if (Robot.isRobotTest()) {
                 Logger.recordOutput(
                         "ROBOT/TEST/SWERVE/CURRENT ROTATION DEGREES",
@@ -62,6 +74,28 @@ public class Swerve extends SubsystemBase {
         if (!isSwerveDisabled) {
             drivetrain.resetPose(pose);
         }
+        simTruthPose = pose;
+    }
+
+    /** Sim only: the robot's true pose, for feeding camera simulators. */
+    public Pose2d getSimTruthPose() {
+        return simTruthPose;
+    }
+
+    private void updateSimTruthPose() {
+        double now = Timer.getFPGATimestamp();
+        if (lastSimTruthTime >= 0) {
+            double dt = now - lastSimTruthTime;
+            ChassisSpeeds v = getState().Speeds; // robot relative, from the simulated modules
+            simTruthPose =
+                    simTruthPose.exp(
+                            new Twist2d(
+                                    v.vxMetersPerSecond * dt,
+                                    v.vyMetersPerSecond * dt,
+                                    v.omegaRadiansPerSecond * dt));
+        }
+        lastSimTruthTime = now;
+        Logger.recordOutput("Sim/TruthPose", simTruthPose);
     }
 
     public AutoFactory createAutoFactory() {

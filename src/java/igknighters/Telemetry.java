@@ -75,8 +75,10 @@ public class Telemetry {
     private final NetworkTable table = inst.getTable("Pose");
     private final DoubleArrayPublisher fieldPub = table.getDoubleArrayTopic("robotPose").publish();
     private final StringPublisher fieldTypePub = table.getStringTopic(".type").publish();
-    private final DoubleArrayPublisher seenTagsPub =
-            table.getDoubleArrayTopic("seenTags").publish();
+    private final DoubleArrayPublisher seenNotAcceptedPub =
+            table.getDoubleArrayTopic("seenNotAcceptedTags").publish();
+    private final DoubleArrayPublisher seenAcceptedTagsPub =
+            table.getDoubleArrayTopic("seenAcceptedTags").publish();
     private final DoubleArrayPublisher unseenTagsPub =
             table.getDoubleArrayTopic("unseenTags").publish();
 
@@ -174,27 +176,40 @@ public class Telemetry {
         fieldPub.set(m_poseArray);
 
         if (aprilTagLayout != null) {
-            List<Integer> visibleIds = subsystems.vision.getVisibleTagIds();
+            List<Integer> visibleIds = subsystems.vision.getAllVisibleTagIds();
+            List<Integer> acceptedIds = subsystems.vision.getAcceptedTagIds();
             Map<Integer, Pose3d> allTagPoses = aprilTagLayout.getTagPoses();
-            List<Pose2d> seenTagPoses = new java.util.ArrayList<>();
+            List<Pose2d> seenNotAcceptedTagPoses = new java.util.ArrayList<>();
+            List<Pose2d> seenAcceptedTagPoses = new java.util.ArrayList<>();
             List<Pose2d> unseenTagPoses = new java.util.ArrayList<>();
 
             for (Map.Entry<Integer, Pose3d> entry : allTagPoses.entrySet()) {
-                if (visibleIds.contains(entry.getKey())) {
-                    seenTagPoses.add(entry.getValue().toPose2d());
+                if (visibleIds.contains(entry.getKey()) && !acceptedIds.contains(entry.getKey())) {
+                    seenNotAcceptedTagPoses.add(entry.getValue().toPose2d());
+                } else if (acceptedIds.contains(entry.getKey())) {
+                    seenAcceptedTagPoses.add(entry.getValue().toPose2d());
                 } else {
                     unseenTagPoses.add(entry.getValue().toPose2d());
                 }
             }
 
-            double[] seenTagsArray = new double[seenTagPoses.size() * 3];
+            double[] seenNotAcceptedTagArray = new double[seenNotAcceptedTagPoses.size() * 3];
             int i = 0;
-            for (Pose2d pose : seenTagPoses) {
-                seenTagsArray[i++] = pose.getX();
-                seenTagsArray[i++] = pose.getY();
-                seenTagsArray[i++] = pose.getRotation().getDegrees();
+            for (Pose2d pose : seenNotAcceptedTagPoses) {
+                seenNotAcceptedTagArray[i++] = pose.getX();
+                seenNotAcceptedTagArray[i++] = pose.getY();
+                seenNotAcceptedTagArray[i++] = pose.getRotation().getDegrees();
             }
-            seenTagsPub.set(seenTagsArray);
+            seenNotAcceptedPub.set(seenNotAcceptedTagArray);
+
+            double[] seenAcceptedTagArray = new double[seenAcceptedTagPoses.size() * 3];
+            i = 0;
+            for (Pose2d pose : seenAcceptedTagPoses) {
+                seenAcceptedTagArray[i++] = pose.getX();
+                seenAcceptedTagArray[i++] = pose.getY();
+                seenAcceptedTagArray[i++] = pose.getRotation().getDegrees();
+            }
+            seenAcceptedTagsPub.set(seenAcceptedTagArray);
 
             double[] unseenTagsArray = new double[unseenTagPoses.size() * 3];
             i = 0;

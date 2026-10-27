@@ -93,6 +93,7 @@ public class LimeLightVision extends SubsystemBase {
     private final Map<String, Limelight> byName = new HashMap<>();
     private final List<Integer> visibleTagIds = new ArrayList<>();
     private final List<Measurement> accepted = new ArrayList<>();
+    private final List<Integer> acceptedTagIds = new ArrayList<>();
     private Boolean wasDisabled = null;
 
     public LimeLightVision(Swerve swerve, List<CameraConfig> configs) {
@@ -104,7 +105,7 @@ public class LimeLightVision extends SubsystemBase {
         }
         if (Robot.isSimulation()) {
             for (int i = 0; i < cams.size(); i++) {
-                cams.get(i).sim = new LimelightSim(cams.get(i).cfg.name);
+                cams.get(i).sim = new LimelightSim(cams.get(i).cfg.name, cams.get(i).cfg.simMount);
             }
         }
     }
@@ -121,8 +122,12 @@ public class LimeLightVision extends SubsystemBase {
     }
 
     /** Tag ids seen by any connected camera in its latest frame. */
-    public List<Integer> getVisibleTagIds() {
+    public List<Integer> getAllVisibleTagIds() {
         return visibleTagIds;
+    }
+
+    public List<Integer> getAcceptedTagIds() {
+        return acceptedTagIds;
     }
 
     /** Measurements sent to the drivetrain this loop. */
@@ -175,6 +180,7 @@ public class LimeLightVision extends SubsystemBase {
         boolean log = !Robot.consts.limelightVision().disableVisionLogs();
         visibleTagIds.clear(); // dont make the list infinite and hold from previous runs
         accepted.clear();
+        acceptedTagIds.clear();
         for (Cam cam : cams) {
             String path = "Vision/" + cam.cfg.name + "/";
 
@@ -194,11 +200,14 @@ public class LimeLightVision extends SubsystemBase {
                 // it will keep sending pose from when turned off
             }
 
+            List<Integer> tagsSeen = new ArrayList<>();
+
             PoseEstimate mt2 = cam.ll.getMegaTag2();
             for (var f : mt2.rawFiducials) {
                 visibleTagIds.add(
                         f.id); // these are just what do i see no gating as to whether they are good
                 // or not
+                tagsSeen.add(f.id);
             }
             if (!cam.cfg.localize || mt2.timestampSeconds == cam.lastFrameTimestamp) {
                 continue; // same frame as last loop, the estimator already has it
@@ -235,12 +244,15 @@ public class LimeLightVision extends SubsystemBase {
             if (reason
                     != null) { // null means all good anything else means something wrong with frame
                 // so no math gets done on it
+                cameraErrorCounts.put(
+                        cam.cfg.name, cameraErrorCounts.getOrDefault(cam.cfg.name, 0) + 1);
                 continue;
             }
 
             Measurement m = measure(cam.cfg, mt2, mt1);
             swerve.addVisionMeasurement(m.pose, m.timestamp, m.stdDevs);
             accepted.add(m);
+            acceptedTagIds.addAll(tagsSeen);
             if (log) {
                 Log.log(path + "Pose", m.pose);
                 Log.log(path + "StdDevs", m.stdDevs.getData());
@@ -250,13 +262,20 @@ public class LimeLightVision extends SubsystemBase {
         if (log) {
             Log.log("Vision/VisibleTags", visibleTagIds.stream().mapToLong(i -> i).toArray());
             Log.log("Vision/AcceptedCount", accepted.size());
+            if (true) { // change this to false when you dont want to be in really deep debug i dont
+                // know how big the lists will get and i envision it being expensive
+                for (String key : cameraErrorCounts.keySet()) {
+                    Log.log("Vision/" + key + "ErrorCount", cameraErrorCounts.get(key));
+                }
+            }
         }
     }
 
     @Override
     public void simulationPeriodic() {
         for (Cam cam : cams) {
-            cam.sim.update(swerve.getState().Pose);
+            // Truth, not our estimate: feeding the estimate back in made the pose random walk
+            cam.sim.update(swerve.getSimTruthPose());
         }
     }
 

@@ -45,13 +45,13 @@ class LimeLightVisionTest {
         // single tag MT1: keep MT2 (gyro) heading, do not correct heading
         var m = measure(cfg, est(3, 4, 10, 1, 2, 0), est(3, 4, 50, 1, 2, 0));
         assertEquals(new Pose2d(3, 4, Rotation2d.fromDegrees(10)), m.pose());
-        assertEquals(0.02 * 4 / 1, m.stdDevs().get(0, 0), 1e-9);
+        assertEquals(cfg.xyStdDevCoeff * 4 / 1, m.stdDevs().get(0, 0), 1e-9);
         assertEquals(NO_TRUST, m.stdDevs().get(2, 0));
 
         // unambiguous multi tag MT1 from the same frame: MT2 translation + MT1 heading
         m = measure(cfg, est(3, 4, 10, 2, 2, 0.05), est(3.2, 4, 30, 2, 2, 0.05));
         assertEquals(new Pose2d(3, 4, Rotation2d.fromDegrees(30)), m.pose());
-        assertEquals(0.06 * 4 / 2, m.stdDevs().get(2, 0), 1e-9);
+        assertEquals(cfg.thetaStdDevCoeff * 4 / 2, m.stdDevs().get(2, 0), 1e-9);
 
         // multi tag MT1 from a different frame: ignored
         m = measure(cfg, est(3, 4, 10, 2, 2, 0.05), at(est(3, 4, 50, 2, 2, 0.05), 1.5));

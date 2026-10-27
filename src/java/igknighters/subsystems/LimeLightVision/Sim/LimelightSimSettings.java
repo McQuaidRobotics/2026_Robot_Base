@@ -4,8 +4,7 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.util.Units;
 
 /**
- * Configurable properties describing a simulated {@link limelight.Limelight} camera, used by {@link
- * LimelightSim}.
+ * Configurable properties describing a simulated Limelight camera, used by {@link LimelightSim}.
  *
  * <p>The defaults approximate a Limelight 3 running the AprilTag pipeline at 1280x960 and require
  * no configuration to get a usable simulation running. Construct one with {@code new
@@ -57,8 +56,12 @@ public class LimelightSimSettings {
      * Baseline standard deviation applied to the translation component of botpose readings, in
      * meters, for a single tag seen at 1 meter. Scaled down as more tags are seen and up with
      * average tag distance.
+     *
+     * <p>0.004 is measured: limelight-back MT2 frame-to-frame noise in the Oct 2026 robot logs was
+     * 0.2-0.6 cm at 0.5-2 m (YALL's 0.03 default was ~10x too noisy). Rotation noise already
+     * matched the measured ~1 deg MT1 heading noise.
      */
-    double translationNoiseStdDevMeters = 0.03;
+    double translationNoiseStdDevMeters = 0.004;
 
     /**
      * Baseline standard deviation applied to the rotation component of botpose readings, in

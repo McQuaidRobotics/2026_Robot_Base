@@ -38,10 +38,15 @@ public class SecondBotConsts extends RobotConsts {
         @Override
         public List<CameraConfig> cameras() {
             return List.of(
-                    new CameraConfig("limelight"),
-                    new CameraConfig("limelight-intake"),
-                    new CameraConfig("limelight-back").throttleDisabled(0),
-                    new CameraConfig("limelight-left"));
+                    // simMount numbers: limelight-configs/<name>/pipeline_0.json rsf, rss, rsu,
+                    // rspitch, rsyaw (pulled Oct 2026). Sim only, the real mount lives on the
+                    // camera.
+                    new CameraConfig("limelight").simMount(-0.2992, 0.2966, 0.335, 15, -135),
+                    new CameraConfig("limelight-intake").simMount(0.0445, 0.3079, 0.2057, 15, -68),
+                    new CameraConfig("limelight-back")
+                            .throttleDisabled(0)
+                            .simMount(-0.3129, -0.2237, 0.1994, 15, 180),
+                    new CameraConfig("limelight-left").simMount(-0.2204, -0.3129, 0.1994, 15, 90));
         }
 
         @Override

@@ -6,8 +6,10 @@ import edu.wpi.first.apriltag.AprilTagFields;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Transform3d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.math.interpolation.TimeInterpolatableBuffer;
 import edu.wpi.first.networktables.DoubleArrayEntry;
@@ -17,6 +19,7 @@ import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.Timer;
 import igknighters.subsystems.LimeLightVision.Helpers.LimelightHelpers;
+import igknighters.util.log.Log;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -53,6 +56,12 @@ public class LimelightSim {
     /** Recent true poses, so a frame reports where the robot was when it was captured. */
     private final TimeInterpolatableBuffer<Pose2d> truthHistory =
             TimeInterpolatableBuffer.createBuffer(1.0);
+
+    /** Fault state: 0 = MT1 normal, +-1 = MT1 flipped to its mirror solution on that side. */
+    private int mt1FlipSign = 0;
+
+    /** Fault state: camera publishes nothing until this time (FPGA seconds). */
+    private double disconnectedUntil = -1;
 
     /** Heartbeat counter, incremented once per published frame. */
     private long heartbeat = 0;
@@ -155,6 +164,14 @@ public class LimelightSim {
         }
         double now = Timer.getFPGATimestamp();
         truthHistory.addSample(now, robotPoseMeters);
+        // Fault: camera dropout. Publish nothing, so the heartbeat stops like an unplugged camera.
+        if (now >= disconnectedUntil && noise.nextDouble() < settings.disconnectChance) {
+            disconnectedUntil = now + settings.disconnectSeconds;
+        }
+        if (now < disconnectedUntil) {
+            Log.log("Sim/Faults" + table.getPath(), "disconnected");
+            return;
+        }
         double tlMs =
                 Math.max(
                         0,
@@ -226,10 +243,12 @@ public class LimelightSim {
 
         Pose3d mt2Pose = tagCount > 0 ? addNoise(robotPose, translationStdDev / 2.0, 0) : robotPose;
 
+        String fault = "none";
         double[] suppliedOrientation = robotOrientationSetEntry.get();
 
         if (suppliedOrientation.length >= 1) {
             Rotation3d groundTruthRotation = mt2Pose.getRotation();
+            double suppliedYaw = Math.toRadians(suppliedOrientation[0]);
 
             mt2Pose =
                     new Pose3d(
@@ -237,8 +256,94 @@ public class LimelightSim {
                             new Rotation3d(
                                     groundTruthRotation.getX(),
                                     groundTruthRotation.getY(),
-                                    Math.toRadians(suppliedOrientation[0])));
+                                    suppliedYaw));
+
+            // MT2 solves position FROM the heading it was given, so a heading error swings the
+            // answer around the tags, and past a point the real camera gives up and reports
+            // field center (seen on the robot).
+            if (primary != null) {
+                double headingError =
+                        MathUtil.angleModulus(suppliedYaw - robotPose.getRotation().getZ());
+                if (Math.abs(Math.toDegrees(headingError)) > settings.mt2FailHeadingErrorDeg) {
+                    mt2Pose =
+                            new Pose3d(
+                                    fieldLayout.getFieldLength() / 2,
+                                    fieldLayout.getFieldWidth() / 2,
+                                    0,
+                                    new Rotation3d());
+                    fault = "MT2 failed (field center)";
+                } else {
+                    // MT2 fits all tags with the heading fixed: robot = mean(tag) - R *
+                    // mean(offset),
+                    // so a heading error rotates it around the CENTER of the tags seen.
+                    Translation2d tag = Translation2d.kZero;
+                    for (TagObservation obs : visible) {
+                        tag = tag.plus(obs.pose.getTranslation().toTranslation2d());
+                    }
+                    tag = tag.div(visible.size());
+                    Translation2d swung =
+                            mt2Pose.getTranslation()
+                                    .toTranslation2d()
+                                    .minus(tag)
+                                    .rotateBy(new Rotation2d(headingError))
+                                    .plus(tag);
+                    mt2Pose =
+                            new Pose3d(
+                                    swung.getX(),
+                                    swung.getY(),
+                                    mt2Pose.getZ(),
+                                    mt2Pose.getRotation());
+                }
+            }
         }
+
+        // Fault: MT1 flips to its mirror solution for a run of frames, with LOW ambiguity
+        if (tagCount == 0) {
+            mt1FlipSign = 0;
+        } else if (mt1FlipSign != 0) {
+            if (noise.nextDouble() < settings.mt1FlipEndChance) {
+                mt1FlipSign = 0;
+            }
+        } else if (noise.nextDouble() < settings.mt1FlipStartChance) {
+            mt1FlipSign = noise.nextBoolean() ? 1 : -1;
+        }
+        if (mt1FlipSign != 0) {
+            Translation2d toTag =
+                    primary.pose
+                            .getTranslation()
+                            .toTranslation2d()
+                            .minus(mt1Pose.getTranslation().toTranslation2d());
+            // ~1 m sideways (perpendicular to the line to the tag) and ~105 deg of heading
+            Translation2d sideways =
+                    toTag.rotateBy(Rotation2d.kCCW_90deg).div(Math.max(toTag.getNorm(), 1e-6));
+            Translation2d shifted =
+                    mt1Pose.getTranslation().toTranslation2d().plus(sideways.times(mt1FlipSign));
+            mt1Pose =
+                    new Pose3d(
+                            shifted.getX(),
+                            shifted.getY(),
+                            mt1Pose.getZ(),
+                            new Rotation3d(
+                                    0,
+                                    0,
+                                    mt1Pose.getRotation().getZ()
+                                            + mt1FlipSign
+                                                    * Math.toRadians(
+                                                            105 + noise.nextGaussian() * 8)));
+            fault = "MT1 flipped";
+        }
+
+        // Fault: MT1 not updated with this frame
+        boolean publishMt1 = noise.nextDouble() >= settings.staleMt1Chance;
+        if (!publishMt1 && tagCount > 0) {
+            fault = "MT1 stale";
+        }
+        for (TagObservation obs : visible) {
+            if (obs.ambiguity >= 0.3) {
+                fault = fault.equals("none") ? "high ambiguity" : fault;
+            }
+        }
+        Log.log("Sim/Faults" + table.getPath(), fault);
 
         Pose3d mt1PoseRed = flipToRed(mt1Pose);
         Pose3d mt2PoseRed = flipToRed(mt2Pose);
@@ -260,7 +365,8 @@ public class LimelightSim {
                 mt1Pose,
                 mt1PoseRed,
                 mt2Pose,
-                mt2PoseRed);
+                mt2PoseRed,
+                publishMt1);
 
         heartbeat++;
     }
@@ -305,7 +411,8 @@ public class LimelightSim {
             Pose3d mt1Pose,
             Pose3d mt1PoseRed,
             Pose3d mt2Pose,
-            Pose3d mt2PoseRed) {
+            Pose3d mt2PoseRed,
+            boolean publishMt1) {
         double[] rawFiducials = new double[7 * tagCount];
 
         for (int i = 0; i < visible.size(); i++) {
@@ -324,35 +431,17 @@ public class LimelightSim {
 
         rawFiducialsEntry.set(rawFiducials);
 
-        botposeEntry.set(
-                botPoseArray(
-                        mt1Pose,
-                        totalLatencyMs,
-                        tagCount,
-                        tagSpan,
-                        avgTagDist,
-                        avgTagArea,
-                        rawFiducials));
-
-        botposeBlueEntry.set(
-                botPoseArray(
-                        mt1Pose,
-                        totalLatencyMs,
-                        tagCount,
-                        tagSpan,
-                        avgTagDist,
-                        avgTagArea,
-                        rawFiducials));
-
-        botposeRedEntry.set(
-                botPoseArray(
-                        mt1PoseRed,
-                        totalLatencyMs,
-                        tagCount,
-                        tagSpan,
-                        avgTagDist,
-                        avgTagArea,
-                        rawFiducials));
+        if (publishMt1) {
+            publishMt1(
+                    mt1Pose,
+                    mt1PoseRed,
+                    totalLatencyMs,
+                    tagCount,
+                    tagSpan,
+                    avgTagDist,
+                    avgTagArea,
+                    rawFiducials);
+        }
 
         botposeOrbEntry.set(
                 botPoseArray(
@@ -455,6 +544,38 @@ public class LimelightSim {
                 new double[] {
                     robotYawDeg, robotRollDeg, robotPitchDeg, robotYawDeg, 0, 0, 0, 0, 0, 0
                 });
+    }
+
+    /** MegaTag1 entries ("botpose", "botpose_wpiblue", "botpose_wpired"). */
+    private void publishMt1(
+            Pose3d mt1Pose,
+            Pose3d mt1PoseRed,
+            double latencyMs,
+            int tagCount,
+            double tagSpan,
+            double avgTagDist,
+            double avgTagArea,
+            double[] rawFiducials) {
+        double[] blue =
+                botPoseArray(
+                        mt1Pose,
+                        latencyMs,
+                        tagCount,
+                        tagSpan,
+                        avgTagDist,
+                        avgTagArea,
+                        rawFiducials);
+        botposeEntry.set(blue);
+        botposeBlueEntry.set(blue);
+        botposeRedEntry.set(
+                botPoseArray(
+                        mt1PoseRed,
+                        latencyMs,
+                        tagCount,
+                        tagSpan,
+                        avgTagDist,
+                        avgTagArea,
+                        rawFiducials));
     }
 
     /**
@@ -597,6 +718,10 @@ public class LimelightSim {
 
         double ambiguity =
                 MathUtil.clamp(noise.nextDouble() * 0.05 + (incidenceDeg / 90.0) * 0.15, 0, 1);
+        // Fault: high ambiguity score on this tag
+        if (noise.nextDouble() < settings.ambiguitySpikeChance) {
+            ambiguity = 0.3 + noise.nextDouble() * 0.65;
+        }
 
         return Optional.of(
                 new TagObservation(

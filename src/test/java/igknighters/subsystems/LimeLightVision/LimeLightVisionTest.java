@@ -42,15 +42,15 @@ class LimeLightVisionTest {
 
     @Test
     void stdDevsAndHeadingSource() {
-        // single tag MT1: keep MT2 (gyro) heading, do not correct heading
-        var m = measure(cfg, est(3, 4, 10, 1, 2, 0), est(3, 4, 50, 1, 2, 0));
+        // single tag MT1 within the nudge limit: keep MT2 (gyro) heading, nudges need 2 tags
+        var m = measure(cfg, est(3, 4, 10, 1, 2, 0), est(3, 4, 13, 1, 2, 0));
         assertEquals(new Pose2d(3, 4, Rotation2d.fromDegrees(10)), m.pose());
         assertEquals(cfg.xyStdDevCoeff * 4 / 1, m.stdDevs().get(0, 0), 1e-9);
         assertEquals(NO_TRUST, m.stdDevs().get(2, 0));
 
         // unambiguous multi tag MT1 from the same frame: MT2 translation + MT1 heading
-        m = measure(cfg, est(3, 4, 10, 2, 2, 0.05), est(3.2, 4, 30, 2, 2, 0.05));
-        assertEquals(new Pose2d(3, 4, Rotation2d.fromDegrees(30)), m.pose());
+        m = measure(cfg, est(3, 4, 10, 2, 2, 0.05), est(3.2, 4, 13, 2, 2, 0.05));
+        assertEquals(new Pose2d(3, 4, Rotation2d.fromDegrees(13)), m.pose());
         assertEquals(cfg.thetaStdDevCoeff * 4 / 2, m.stdDevs().get(2, 0), 1e-9);
 
         // multi tag MT1 from a different frame: ignored
@@ -70,7 +70,7 @@ class LimeLightVisionTest {
     void mt2GarbageWithAmbiguousMt1IsRejected() {
         var mt2 = est(8.271, 4.035, 0, 2, 1, 0.6);
         var mt1 = est(5.44, 3.29, -97, 2, 1, 0.6);
-        assertEquals("MT1/MT2 disagree", rejectReason(cfg, mt2, mt1, 0, 0));
+        assertEquals("MT2 failed (field center)", rejectReason(cfg, mt2, mt1, 0, 0));
     }
 
     /** Wrong heading (e.g. robot booted facing backwards): fix heading only, never jump x/y. */
@@ -88,12 +88,25 @@ class LimeLightVisionTest {
         assertTrue(m.stdDevs().get(2, 0) < 1);
     }
 
-    /** A flip that happens to agree on x/y must not swing heading, only nudges are allowed. */
+    /**
+     * A flip that happens to agree on x/y: MT2 is not trusted and nothing changes without a vote.
+     */
     @Test
     void agreeingFrameCannotSwingHeading() {
-        var m = measure(cfg, est(5.3, 4.3, 100, 2, 1, 0.05), est(5.4, 4.3, -98, 2, 1, 0.05));
-        assertEquals(100, m.pose().getRotation().getDegrees(), 1e-9);
-        assertEquals(NO_TRUST, m.stdDevs().get(2, 0));
+        var mt2 = est(5.3, 4.3, 100, 2, 1, 0.05);
+        var mt1 = est(5.4, 4.3, -98, 2, 1, 0.05);
+        assertEquals("MT1/MT2 disagree", rejectReason(cfg, mt2, mt1, 0, 0));
+    }
+
+    /** A small heading error bends MT2's position, so a trusted MT1 beyond 5 deg blocks it. */
+    @Test
+    void headingErrorBeyondNudgeLimitBlocksMt2Position() {
+        var mt2 = est(5.3, 4.3, 15, 2, 2.5, 0.05); // bent ~0.65 m, under the 1 m limit
+        var mt1 = est(5.8, 4.0, 0, 2, 2.5, 0.05);
+        assertEquals("MT1/MT2 disagree", rejectReason(cfg, mt2, mt1, 0, 0));
+        var m = measure(cfg, mt2, mt1);
+        assertTrue(m.headingReset());
+        assertEquals(-15, m.headingGap().getDegrees(), 1e-9);
     }
 
     /** Gyro 180 off while the robot spins: the gap stays put, so a reset can happen mid-match. */
@@ -122,7 +135,27 @@ class LimeLightVisionTest {
         assertEquals(87, measure(cfg, mt2, mt1).pose().getRotation().getDegrees(), 1e-9);
 
         // agreeing single tag frame: no per-frame nudge
-        var m = measure(cfg, est(12, 5.5, 0, 1, 1.5, 0.1), est(12.1, 5.5, 10, 1, 1.5, 0.1));
+        var m = measure(cfg, est(12, 5.5, 0, 1, 1.5, 0.1), est(12.1, 5.5, 3, 1, 1.5, 0.1));
         assertEquals(NO_TRUST, m.stdDevs().get(2, 0));
+    }
+
+    /** Near midfield, MT2's field-center garbage is under 1 m from the truth. Still rejected. */
+    @Test
+    void mt2FieldCenterNearMidfieldIsRejected() {
+        var mt2 =
+                est(
+                        igknighters.constants.FieldConstants.X_FIELD / 2,
+                        igknighters.constants.FieldConstants.Y_FIELD / 2,
+                        0,
+                        2,
+                        2,
+                        0.05);
+        var mt1 = est(8.6, 4.4, 37, 2, 2, 0.05); // real pose ~0.5 m away
+        assertEquals("MT2 failed (field center)", rejectReason(cfg, mt2, mt1, 0, 0));
+        // a steady MT1 can still fix the heading, never the position
+        assertNull(rejectReason(cfg, mt2, mt1, 0, 1.0));
+        var m = measure(cfg, mt2, mt1);
+        assertEquals(NO_TRUST, m.stdDevs().get(0, 0));
+        assertEquals(37, m.pose().getRotation().getDegrees(), 1e-9);
     }
 }

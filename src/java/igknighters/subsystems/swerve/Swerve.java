@@ -8,6 +8,7 @@ import com.ctre.phoenix6.swerve.SwerveDrivetrain.SwerveDriveState;
 import com.ctre.phoenix6.swerve.SwerveRequest;
 import edu.wpi.first.math.Matrix;
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Twist2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.numbers.N1;
@@ -75,6 +76,23 @@ public class Swerve extends SubsystemBase {
             drivetrain.resetPose(pose);
         }
         simTruthPose = pose;
+    }
+
+    /** Correct the heading only (keeps x/y). The sim truth pose is not touched: it is truth. */
+    public void resetRotation(Rotation2d rotation) {
+        if (!isSwerveDisabled) {
+            drivetrain.resetRotation(rotation);
+        }
+    }
+
+    /**
+     * Sim only: make the robot believe its heading is {@code errorDeg} off from the truth (like
+     * booting facing the wrong way), without moving the truth. For testing the vision heading fix.
+     */
+    public void simBreakHeading(double errorDeg) {
+        if (Robot.isSimulation()) {
+            resetRotation(simTruthPose.getRotation().plus(Rotation2d.fromDegrees(errorDeg)));
+        }
     }
 
     /** Sim only: the robot's true pose, for feeding camera simulators. */

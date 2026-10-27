@@ -69,6 +69,54 @@ public class LimelightSimSettings {
      */
     double rotationNoiseStdDevDegrees = 1.5;
 
+    // ---- Fault injection, modeled on what the Oct 2026 robot logs actually showed ----
+
+    /**
+     * Chance per frame that MT1 starts flipping to its mirror solution (heading about +-105 deg,
+     * position about 1 m off, ambiguity still LOW, which is what makes it dangerous).
+     */
+    double mt1FlipStartChance = 0.02;
+
+    /** Chance per frame a flip ends. 0.15 gives runs of ~7 frames; the robot saw up to 30. */
+    double mt1FlipEndChance = 0.15;
+
+    /** Chance per tag per frame of a high (0.3-0.95) ambiguity score. */
+    double ambiguitySpikeChance = 0.05;
+
+    /** Chance per frame MT1 is not updated with the frame (~2% on the robot). */
+    double staleMt1Chance = 0.02;
+
+    /**
+     * MT2 is solved from the heading we send. Beyond this heading error (degrees) it fails and
+     * reports field center, like the real camera; below it the position swings around the tag.
+     */
+    double mt2FailHeadingErrorDeg = 30;
+
+    /** Chance per frame the camera drops out (heartbeat stops). ~Once per 2 min at 50 fps. */
+    double disconnectChance = 1.0 / 6000;
+
+    /** How long a dropout lasts, in seconds. */
+    double disconnectSeconds = 1.5;
+
+    /**
+     * Set the fault injection rates. All chances are per frame (per tag for ambiguity).
+     *
+     * @return {@link LimelightSimSettings} for chaining.
+     */
+    public LimelightSimSettings withFaults(
+            double mt1FlipStartChance,
+            double mt1FlipEndChance,
+            double ambiguitySpikeChance,
+            double staleMt1Chance,
+            double disconnectChance) {
+        this.mt1FlipStartChance = mt1FlipStartChance;
+        this.mt1FlipEndChance = mt1FlipEndChance;
+        this.ambiguitySpikeChance = ambiguitySpikeChance;
+        this.staleMt1Chance = staleMt1Chance;
+        this.disconnectChance = disconnectChance;
+        return this;
+    }
+
     /** Seed used for the deterministic noise {@link java.util.Random} source. */
     long randomSeed = 4152026L;
 
@@ -211,16 +259,18 @@ public class LimelightSimSettings {
     }
 
     /**
-     * Create {@link LimelightSimSettings} with all noise and latency zeroed out, useful for
-     * deterministic testing.
+     * Create {@link LimelightSimSettings} with all noise, latency and random faults zeroed out,
+     * useful for deterministic testing. MT2 still fails on a large heading error, since that is how
+     * MegaTag2 works rather than a random fault.
      *
-     * @return {@link LimelightSimSettings} with no noise or latency.
+     * @return {@link LimelightSimSettings} with no noise, latency or random faults.
      */
     public static LimelightSimSettings perfect() {
         return new LimelightSimSettings()
                 .withPipelineLatency(0, 0)
                 .withCaptureLatency(0)
                 .withAngleNoise(0)
-                .withPoseNoise(0, 0);
+                .withPoseNoise(0, 0)
+                .withFaults(0, 1, 0, 0, 0);
     }
 }

@@ -38,8 +38,12 @@ public class CameraConfig {
     /** MT1 vs MT2 translation gap (meters) that means our heading is wrong. */
     public double maxMt1Mt2Disagreement = 1.0;
 
-    /** Most an agreeing frame's MegaTag1 heading may move the robot heading (degrees). */
-    public double maxHeadingCorrectionDeg = 30;
+    /**
+     * Degrees. Within this, MegaTag1 gently nudges our heading every frame. Beyond it, our heading
+     * is wrong enough to bend MegaTag2's position, so MT2 position is not used and only the
+     * vote-based heading reset may fix it. MT1 heading noise was ~1 deg on the robot.
+     */
+    public double maxHeadingCorrectionDeg = 5;
 
     /**
      * MegaTag1 must hold the same offset from our heading (within 5 degrees) this long before it

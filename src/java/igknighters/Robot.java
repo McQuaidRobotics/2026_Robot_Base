@@ -6,12 +6,16 @@ package igknighters;
 
 import choreo.auto.AutoChooser;
 import choreo.auto.AutoFactory;
+import edu.wpi.first.apriltag.AprilTagFieldLayout;
+import edu.wpi.first.apriltag.AprilTagFields;
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import igknighters.commands.teleop.TeleopSwerveWithDetune;
 import igknighters.constants.DrivingSharedState;
@@ -218,6 +222,37 @@ public class Robot extends LoggedRobot {
         publishCommandsAndSubystems(subsystems);
         setUpAutos(subsystems);
         bindDriverController();
+        if (Robot.isSimulation()) {
+            setUpSimBadHeading();
+        }
+    }
+
+    /**
+     * Sim only: start like a robot that booted with its heading wrong. Truly 2.5 m in front of the
+     * blue hub face facing 0 deg (limelight-back sees tags 19/20), but the robot believes it is off
+     * by "Sim/HeadingErrorDeg". Vision should fix it within a few seconds. Press "Sim/Break
+     * heading" on the dashboard to do it again at any time, even while driving.
+     */
+    private void setUpSimBadHeading() {
+        Pose2d tag19 =
+                AprilTagFieldLayout.loadField(AprilTagFields.kDefaultField)
+                        .getTagPose(19)
+                        .orElseThrow()
+                        .toPose2d();
+        subsystems.swerve.resetPose(
+                new Pose2d(tag19.getX() + 2.5, tag19.getY() + 0.18, Rotation2d.kZero));
+        SmartDashboard.putNumber("Sim/HeadingErrorDeg", 45);
+        Command breakHeading =
+                Commands.runOnce(
+                                () ->
+                                        subsystems.swerve.simBreakHeading(
+                                                SmartDashboard.getNumber(
+                                                        "Sim/HeadingErrorDeg", 45)))
+                        .ignoringDisable(true)
+                        .withName("Break heading");
+        SmartDashboard.putData("Sim/Break heading", breakHeading);
+        // runs on the first scheduler loop, after the start pose above has been applied
+        CommandScheduler.getInstance().schedule(breakHeading);
     }
 
     public Supplier<Pose2d> poseSupplier() {

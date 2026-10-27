@@ -24,7 +24,8 @@
         {},
         {
           "decKey": 263,
-          "incKey": 262
+          "incKey": 262,
+          "maxAbsValue": 0.5
         }
       ],
       "axisCount": 6,

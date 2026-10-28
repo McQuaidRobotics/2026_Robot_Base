@@ -50,6 +50,9 @@ public class FieldVisualizer {
     private final DoubleArrayPublisher detectedObjectsPub =
             table.getDoubleArrayTopic("detectedObjects").publish();
 
+    private final DoubleArrayPublisher rawDetectionsPub =
+            table.getDoubleArrayTopic("detectedObjectsRaw").publish();
+
     private final DoubleArrayPublisher simObjectsSeenPub =
             table.getDoubleArrayTopic("simObjectsSeen").publish();
 
@@ -99,6 +102,11 @@ public class FieldVisualizer {
             array[i++] = obj.getRotation().getDegrees();
         }
         detectedObjectsPub.set(array);
+    }
+
+    /** Every object detection this loop before tracking, to compare with "detectedObjects". */
+    public void updateRawDetections(List<Translation2d> raw) {
+        rawDetectionsPub.set(shouldShowDetectedObjects.value() ? toArray(raw) : new double[0]);
     }
 
     /**

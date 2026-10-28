@@ -22,6 +22,12 @@ public class ObjectDetectionConfig {
     /** Detections that land farther than this from the robot are dropped (meters). */
     public double maxObjectDistance = 6.0;
 
+    /**
+     * Frame-to-frame jitter of the detector's tx/ty (degrees, 1 std dev). Sets how much a far
+     * detection is trusted. Measure it: log tync of a ball sitting still. The sim uses 0.3.
+     */
+    public double angleNoiseDeg = 0.3;
+
     /** Frames skipped while disabled, keeps the camera cool. */
     public int throttleDisabled = 300;
 
@@ -39,6 +45,11 @@ public class ObjectDetectionConfig {
 
     public ObjectDetectionConfig maxObjectDistance(double v) {
         maxObjectDistance = v;
+        return this;
+    }
+
+    public ObjectDetectionConfig angleNoiseDeg(double v) {
+        angleNoiseDeg = v;
         return this;
     }
 

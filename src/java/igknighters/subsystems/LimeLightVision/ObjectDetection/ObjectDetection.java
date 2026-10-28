@@ -16,6 +16,7 @@ import igknighters.subsystems.LimeLightVision.Helpers.LimelightHelpers;
 import igknighters.subsystems.LimeLightVision.Helpers.LimelightHelpers.RawDetection;
 import igknighters.subsystems.LimeLightVision.Localization.Limelight;
 import igknighters.subsystems.LimeLightVision.ObjectDetection.ObjectDetectionSim.ObjectDetectionSim;
+import igknighters.subsystems.LimeLightVision.ObjectDetection.ObjectTracker.Measurement;
 import igknighters.subsystems.swerve.Swerve;
 import igknighters.util.log.Log;
 import java.util.ArrayList;
@@ -34,13 +35,18 @@ import java.util.Set;
  * the frame was captured onto the plane at the object's center height (objects are assumed to sit
  * on the floor).
  *
- * <p>Positions are raw per detection: an object seen by two cameras is in the list twice.
+ * <p>Raw detections jump around (a low camera turns a little angle noise into a lot of range
+ * noise), so they go through an {@link ObjectTracker} per label: what comes out is one steady
+ * position per object, also when two cameras see it.
  */
 public class ObjectDetection extends SubsystemBase {
     /** Sim only: an object on the field, sitting on the floor. */
     public record SimObject(String label, Translation2d position) {}
 
     private static final double DISCONNECT_SECONDS = 0.5;
+
+    /** Floor on a detection's std dev (meters): box center vs object center, mount error. */
+    static final double MIN_STD_DEV = 0.05;
 
     private static class Cam {
         final Limelight ll;
@@ -61,6 +67,7 @@ public class ObjectDetection extends SubsystemBase {
     private final Swerve swerve;
     private final List<Cam> cams = new ArrayList<>();
     private final Map<String, List<Translation2d>> objects = new HashMap<>();
+    private final Map<String, ObjectTracker> trackers = new HashMap<>();
     private Boolean wasDisabled = null;
 
     /** Sim only: the objects on the field the simulated cameras can see. Edit freely. */
@@ -76,13 +83,15 @@ public class ObjectDetection extends SubsystemBase {
             cams.add(cam);
             for (String label : cfg.labels) {
                 objects.put(label, new ArrayList<>());
+                trackers.put(label, new ObjectTracker());
             }
         }
     }
 
     /**
-     * Field positions (wpiBlue, meters) of every object in each camera's latest frame, keyed by
-     * label. Every configured label is present, with an empty list when nothing sees it.
+     * Field positions (wpiBlue, meters) of every object currently seen, one per object, keyed by
+     * label. Every configured label is present, with an empty list when nothing sees it. An object
+     * shows up after a few detections and drops out half a second after it was last seen.
      */
     public Map<String, List<Translation2d>> getObjects() {
         return objects;
@@ -105,41 +114,59 @@ public class ObjectDetection extends SubsystemBase {
             }
         }
 
-        for (List<Translation2d> list : objects.values()) {
-            list.clear();
-        }
+        List<Translation2d> raw = new ArrayList<>();
         for (Cam cam : cams) {
             double hb = cam.ll.getHeartbeat();
-            if (hb != cam.lastHeartbeat) {
+            boolean newFrame = hb != cam.lastHeartbeat;
+            if (newFrame) {
                 cam.lastHeartbeat = hb;
                 cam.lastHeartbeatChange = now;
             }
             boolean connected = now - cam.lastHeartbeatChange < DISCONNECT_SECONDS;
             cam.disconnected.set(!connected);
-            if (!connected) {
-                continue; // NetworkTables keeps the last values forever, do not trust them
+            if (!connected || !newFrame) {
+                // NetworkTables keeps the last values forever, do not trust a dead camera. And the
+                // same frame fed twice would count as two sightings.
+                continue;
             }
             // Same timestamp LimelightHelpers gives poses: when the frame arrived minus latency
             double captured =
                     LimelightHelpers.getLimelightNTTableEntry(cam.cfg.name, "hb").getLastChange()
                                     / 1e6
                             - (cam.ll.getPipelineLatencyMs() + cam.ll.getCaptureLatencyMs()) / 1e3;
-            addDetections(
-                    cam.cfg, cam.ll.getRawDetections(), swerve.samplePoseAt(captured), objects);
+            Map<String, List<Measurement>> frame = new HashMap<>();
+            addDetections(cam.cfg, cam.ll.getRawDetections(), swerve.samplePoseAt(captured), frame);
+            // every label of this camera, even unseen ones, then any class id missing from them
+            for (String label : cam.cfg.labels) {
+                frame.putIfAbsent(label, List.of());
+            }
+            for (var e : frame.entrySet()) {
+                trackers.computeIfAbsent(e.getKey(), k -> new ObjectTracker())
+                        .update(e.getValue(), now);
+                for (Measurement m : e.getValue()) {
+                    raw.add(m.position());
+                }
+            }
         }
+
         List<Pose2d> all = new ArrayList<>();
-        for (List<Translation2d> list : objects.values()) {
+        for (var e : trackers.entrySet()) {
+            List<Translation2d> list = objects.computeIfAbsent(e.getKey(), k -> new ArrayList<>());
+            list.clear();
+            e.getValue().confirmed(now, list);
             for (Translation2d p : list) {
                 all.add(new Pose2d(p, Rotation2d.kZero));
             }
         }
-        // FieldVisualizer.getInstance().updateDetectedObjects(all);
+        FieldVisualizer.getInstance().updateDetectedObjects(all);
+        FieldVisualizer.getInstance().updateRawDetections(raw);
         if (!Robot.consts.limelightVision().disableVisionLogs()) {
             for (var e : objects.entrySet()) {
                 Log.log(
                         "ObjectDetection/" + e.getKey(),
                         e.getValue().toArray(Translation2d[]::new));
             }
+            Log.log("ObjectDetection/Raw", raw.toArray(Translation2d[]::new));
         }
     }
 
@@ -169,24 +196,29 @@ public class ObjectDetection extends SubsystemBase {
             ObjectDetectionConfig cfg,
             RawDetection[] detections,
             Pose2d robotAtCapture,
-            Map<String, List<Translation2d>> out) {
+            Map<String, List<Measurement>> out) {
         for (RawDetection d : detections) {
             String label =
                     d.classId >= 0 && d.classId < cfg.labels.length
                             ? cfg.labels[d.classId]
                             : "class " + d.classId;
             toField(robotAtCapture, cfg, d.txnc, d.tync)
-                    .ifPresent(p -> out.computeIfAbsent(label, k -> new ArrayList<>()).add(p));
+                    .ifPresent(m -> out.computeIfAbsent(label, k -> new ArrayList<>()).add(m));
         }
     }
 
     /**
-     * Where a detection at (tx, ty) lands on the plane {@code cfg.objectHeight} above the floor.
-     * Limelight angles: tx positive right, ty positive up, each the atan of that axis's normalized
-     * image coordinate, so the ray in camera space is (1, -tan tx, tan ty). Empty when the ray
-     * never reaches the plane (at or above the horizon) or lands past {@code maxObjectDistance}.
+     * Where a detection at (tx, ty) lands on the plane {@code cfg.objectHeight} above the floor,
+     * and how far off that may be. Limelight angles: tx positive right, ty positive up, each the
+     * atan of that axis's normalized image coordinate, so the ray in camera space is (1, -tan tx,
+     * tan ty). Empty when the ray never reaches the plane (at or above the horizon) or lands past
+     * {@code maxObjectDistance}.
+     *
+     * <p>Range comes from the angle down to the object: with height gap h and range r, an angle
+     * error d moves it (r^2 + h^2) / h * d. About 5 cm at 1 m but 40 cm at 3 m for a camera 12 cm
+     * above the ball's center, which is why far detections must count for less.
      */
-    static Optional<Translation2d> toField(
+    static Optional<Measurement> toField(
             Pose2d robot, ObjectDetectionConfig cfg, double txDeg, double tyDeg) {
         Pose3d camera = new Pose3d(robot).plus(cfg.robotToCamera);
         Translation3d ray =
@@ -203,6 +235,9 @@ public class ObjectDetection extends SubsystemBase {
         if (p.getDistance(robot.getTranslation()) > cfg.maxObjectDistance) {
             return Optional.empty();
         }
-        return Optional.of(p);
+        double h = Math.abs(camera.getZ() - cfg.objectHeight);
+        double r = p.getDistance(camera.getTranslation().toTranslation2d());
+        double stdDev = (r * r + h * h) / h * Math.toRadians(cfg.angleNoiseDeg);
+        return Optional.of(new Measurement(p, Math.max(MIN_STD_DEV, stdDev)));
     }
 }

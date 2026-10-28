@@ -133,7 +133,7 @@ public class ObjectDetection extends SubsystemBase {
                 all.add(new Pose2d(p, Rotation2d.kZero));
             }
         }
-        FieldVisualizer.getInstance().updateDetectedObjects(all);
+        // FieldVisualizer.getInstance().updateDetectedObjects(all);
         if (!Robot.consts.limelightVision().disableVisionLogs()) {
             for (var e : objects.entrySet()) {
                 Log.log(

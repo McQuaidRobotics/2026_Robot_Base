@@ -1,4 +1,4 @@
-package igknighters.subsystems.LimeLightVision.Sim;
+package igknighters.subsystems.LimeLightVision.Localization.LocalizationSim;
 
 import edu.wpi.first.apriltag.AprilTag;
 import edu.wpi.first.apriltag.AprilTagFieldLayout;

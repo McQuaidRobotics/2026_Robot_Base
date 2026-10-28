@@ -1,4 +1,4 @@
-package igknighters.subsystems.LimeLightVision.Sim;
+package igknighters.subsystems.LimeLightVision.Localization.LocalizationSim;
 
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.util.Units;

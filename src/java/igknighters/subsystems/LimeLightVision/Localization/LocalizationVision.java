@@ -1,4 +1,4 @@
-package igknighters.subsystems.LimeLightVision;
+package igknighters.subsystems.LimeLightVision.Localization;
 
 import edu.wpi.first.apriltag.AprilTagFieldLayout;
 import edu.wpi.first.apriltag.AprilTagFields;
@@ -19,9 +19,10 @@ import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import igknighters.Robot;
 import igknighters.constants.FieldConstants;
+import igknighters.subsystems.LimeLightVision.CameraConfig;
 import igknighters.subsystems.LimeLightVision.Helpers.LimelightHelpers;
 import igknighters.subsystems.LimeLightVision.Helpers.LimelightHelpers.PoseEstimate;
-import igknighters.subsystems.LimeLightVision.Sim.LimelightSim;
+import igknighters.subsystems.LimeLightVision.Localization.LocalizationSim.LimelightSim;
 import igknighters.subsystems.swerve.Swerve;
 import igknighters.util.log.Log;
 import java.util.ArrayDeque;
@@ -41,7 +42,7 @@ import java.util.Map;
  * feature raw. Adding object detection, tag tracking, or a turret camera is a {@link CameraConfig}
  * plus a consumer of {@link Limelight}; this file does not change.
  */
-public class LimeLightVision extends SubsystemBase {
+public class LocalizationVision extends SubsystemBase {
     /**
      * One frame's correction. {@code headingReset}: MT1 has steadily said our heading is off by
      * {@code headingGap}; apply it in one step instead of as a filtered measurement.
@@ -173,7 +174,7 @@ public class LimeLightVision extends SubsystemBase {
     private final List<Integer> acceptedTagIds = new ArrayList<>();
     private Boolean wasDisabled = null;
 
-    public LimeLightVision(Swerve swerve, List<CameraConfig> configs) {
+    public LocalizationVision(Swerve swerve, List<CameraConfig> configs) {
         this.swerve = swerve;
         for (CameraConfig cfg : configs) {
             Cam cam = new Cam(cfg);

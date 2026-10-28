@@ -15,7 +15,10 @@ import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.simulation.SimHooks;
 import igknighters.subsystems.LimeLightVision.Helpers.LimelightHelpers.PoseEstimate;
-import igknighters.subsystems.LimeLightVision.Sim.LimelightSim;
+import igknighters.subsystems.LimeLightVision.Localization.Limelight;
+import igknighters.subsystems.LimeLightVision.Localization.LocalizationVision;
+import igknighters.subsystems.LimeLightVision.Localization.LocalizationSim.LimelightSim;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -63,7 +66,7 @@ class BadStartHeadingTest {
                         .simMount(-0.3129, -0.2237, 0.1994, 15, 180); // real limelight-back mount
         var ll = new Limelight(cfg.name);
         var sim = new LimelightSim(cfg.name, cfg.simMount); // default settings: all faults on
-        var tracker = new LimeLightVision.HeadingGapTracker();
+        var tracker = new LocalizationVision.HeadingGapTracker();
         TimeInterpolatableBuffer<Rotation2d> sentHeadings =
                 TimeInterpolatableBuffer.createBuffer(1.5);
 
@@ -99,12 +102,12 @@ class BadStartHeadingTest {
             ll.setRobotOrientation(pose.getRotation().getDegrees(), spinDps);
             sim.update(truth);
             PoseEstimate mt2 = ll.getMegaTag2();
-            LimeLightVision.alignMt2ToCaptureHeading(
+            LocalizationVision.alignMt2ToCaptureHeading(
                     mt2, sentHeadings.getSample(mt2.timestampSeconds).orElse(pose.getRotation()));
             if (mt2.timestampSeconds == lastFrame) continue;
             lastFrame = mt2.timestampSeconds;
             PoseEstimate mt1 = ll.getMegaTag1();
-            var d = LimeLightVision.decide(cfg, mt2, mt1, spinDps, tracker);
+            var d = LocalizationVision.decide(cfg, mt2, mt1, spinDps, tracker);
             if (d.reason() == null) {
                 var m = d.measurement();
                 if (m.headingReset()) { // same as periodic: shift heading by the voted gap

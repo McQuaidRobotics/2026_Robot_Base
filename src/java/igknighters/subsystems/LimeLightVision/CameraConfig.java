@@ -3,10 +3,12 @@ package igknighters.subsystems.LimeLightVision;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Transform3d;
+import igknighters.subsystems.LimeLightVision.Localization.LocalizationVision;
+
 import java.util.function.Supplier;
 
 /**
- * Per-camera settings handed to {@link LimeLightVision}. Everything that differs between cameras or
+ * Per-camera settings handed to {@link LocalizationVision}. Everything that differs between cameras or
  * robots lives here so the vision code itself never has to change.
  *
  * <pre>

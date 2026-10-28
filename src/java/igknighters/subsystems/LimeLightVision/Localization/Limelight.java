@@ -1,4 +1,4 @@
-package igknighters.subsystems.LimeLightVision;
+package igknighters.subsystems.LimeLightVision.Localization;
 
 import edu.wpi.first.math.geometry.Pose3d;
 import igknighters.subsystems.LimeLightVision.Helpers.LimelightHelpers;
@@ -13,7 +13,7 @@ import igknighters.subsystems.LimeLightVision.Helpers.LimelightHelpers.RawTarget
  * One physical Limelight. Raw passthrough to LimelightHelpers: no filtering, no math, no state.
  *
  * <p>Anything that wants camera data (pose fusion, object detection, tag tracking, ...) grabs the
- * camera from {@link LimeLightVision#camera(String)} and calls these directly. Units and frames are
+ * camera from {@link LocalizationVision#camera(String)} and calls these directly. Units and frames are
  * whatever the Limelight publishes (degrees, meters, wpiBlue unless named otherwise).
  */
 public class Limelight {

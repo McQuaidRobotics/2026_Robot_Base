@@ -1,14 +1,16 @@
 package igknighters.subsystems.LimeLightVision;
 
-import static igknighters.subsystems.LimeLightVision.LimeLightVision.NO_TRUST;
-import static igknighters.subsystems.LimeLightVision.LimeLightVision.measure;
-import static igknighters.subsystems.LimeLightVision.LimeLightVision.rejectReason;
+import static igknighters.subsystems.LimeLightVision.Localization.LocalizationVision.NO_TRUST;
+import static igknighters.subsystems.LimeLightVision.Localization.LocalizationVision.measure;
+import static igknighters.subsystems.LimeLightVision.Localization.LocalizationVision.rejectReason;
 import static org.junit.jupiter.api.Assertions.*;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import igknighters.subsystems.LimeLightVision.Helpers.LimelightHelpers.PoseEstimate;
 import igknighters.subsystems.LimeLightVision.Helpers.LimelightHelpers.RawFiducial;
+import igknighters.subsystems.LimeLightVision.Localization.LocalizationVision;
+
 import org.junit.jupiter.api.Test;
 
 class LimeLightVisionTest {
@@ -115,10 +117,10 @@ class LimeLightVisionTest {
         for (double robotDeg = 0; robotDeg < 360; robotDeg += 45) {
             var mt2 = est(5, 4, robotDeg, 2, 1, 0.05);
             var mt1 = est(5, 4, robotDeg + 180, 2, 1, 0.05);
-            assertEquals(180, Math.abs(LimeLightVision.headingGap(mt2, mt1).getDegrees()), 1e-6);
+            assertEquals(180, Math.abs(LocalizationVision.headingGap(mt2, mt1).getDegrees()), 1e-6);
         }
-        var flipA = LimeLightVision.headingGap(est(5, 4, 0, 2, 1, 0), est(5, 4, 101, 2, 1, 0));
-        var flipB = LimeLightVision.headingGap(est(5, 4, 0, 2, 1, 0), est(5, 4, -98, 2, 1, 0));
+        var flipA = LocalizationVision.headingGap(est(5, 4, 0, 2, 1, 0), est(5, 4, 101, 2, 1, 0));
+        var flipB = LocalizationVision.headingGap(est(5, 4, 0, 2, 1, 0), est(5, 4, -98, 2, 1, 0));
         assertTrue(Math.abs(flipA.minus(flipB).getDegrees()) > 5);
     }
 

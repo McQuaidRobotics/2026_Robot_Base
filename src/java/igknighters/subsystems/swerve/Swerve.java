@@ -54,6 +54,7 @@ public class Swerve extends SubsystemBase {
     public void periodic() {
         if (!isSwerveDisabled) {
             drivetrain.periodic();
+            Logger.recordOutput("Swerve/Pose", drivetrain.getState().Pose);
             if (Robot.isSimulation()) {
                 updateSimTruthPose();
             }

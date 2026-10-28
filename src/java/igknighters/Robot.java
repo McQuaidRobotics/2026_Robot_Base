@@ -34,6 +34,7 @@ import igknighters.util.RobotPosePredictor;
 import igknighters.util.TunableValues;
 import igknighters.util.TunableValues.TunableDouble;
 import igknighters.util.log.Log;
+import igknighters.util.log.LogPruner;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Optional;
@@ -189,6 +190,7 @@ public class Robot extends LoggedRobot {
                                 System.getProperty("os.arch")));
         if (Robot.isReal()) {
             // roboRIO 2 SD card, no USB stick needed. Pull logs with AdvantageScope or scp.
+            LogPruner.prune("/home/lvuser/logs"); // drop month-old logs, keep 5 GB free
             Logger.addDataReceiver(new WPILOGWriter("/home/lvuser/logs"));
             Logger.addDataReceiver(new NT4Publisher());
         } else {

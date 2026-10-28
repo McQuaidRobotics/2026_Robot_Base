@@ -1,6 +1,7 @@
 package igknighters.constants;
 
 import igknighters.subsystems.LimeLightVision.CameraConfig;
+import igknighters.subsystems.LimeLightVision.ObjectDetection.ObjectDetectionConfig;
 import igknighters.subsystems.swerve.swerveconstants.CommonSwerveConsts;
 import java.util.List;
 
@@ -27,7 +28,11 @@ public abstract class RobotConsts {
      * Limelight.
      */
     public interface kLimelightVisionConsts {
+        /** Localization cameras. */
         List<CameraConfig> cameras();
+
+        /** Neural detector cameras. A camera is in one list or the other, never both. */
+        List<ObjectDetectionConfig> objectDetectionCameras();
 
         boolean disableVisionLogs();
     }

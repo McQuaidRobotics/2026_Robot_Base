@@ -1,6 +1,7 @@
 package igknighters;
 
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.networktables.DoubleArrayPublisher;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableInstance;
@@ -49,6 +50,12 @@ public class FieldVisualizer {
     private final DoubleArrayPublisher detectedObjectsPub =
             table.getDoubleArrayTopic("detectedObjects").publish();
 
+    private final DoubleArrayPublisher simObjectsSeenPub =
+            table.getDoubleArrayTopic("simObjectsSeen").publish();
+
+    private final DoubleArrayPublisher simObjectsUnseenPub =
+            table.getDoubleArrayTopic("simObjectsUnseen").publish();
+
     public void updatePredictedPose(Pose2d pred_pose) {
         if (pred_pose == null) {
             predictedFuturePose.set(new double[0]);
@@ -92,6 +99,26 @@ public class FieldVisualizer {
             array[i++] = obj.getRotation().getDegrees();
         }
         detectedObjectsPub.set(array);
+    }
+
+    /**
+     * Sim only: the true objects on the field, split by whether any simulated detector camera has
+     * them in view. Compare with "detectedObjects" (where the robot thinks they are).
+     */
+    public void updateSimObjects(List<Translation2d> seen, List<Translation2d> unseen) {
+        simObjectsSeenPub.set(toArray(seen));
+        simObjectsUnseenPub.set(toArray(unseen));
+    }
+
+    private static double[] toArray(List<Translation2d> points) {
+        double[] array = new double[points.size() * 3];
+        int i = 0;
+        for (Translation2d p : points) {
+            array[i++] = p.getX();
+            array[i++] = p.getY();
+            array[i++] = 0;
+        }
+        return array;
     }
 
     /**

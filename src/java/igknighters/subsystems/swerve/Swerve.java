@@ -4,6 +4,7 @@ import choreo.Choreo.TrajectoryLogger;
 import choreo.auto.AutoFactory;
 import choreo.auto.AutoTrajectory;
 import choreo.trajectory.SwerveSample;
+import com.ctre.phoenix6.Utils;
 import com.ctre.phoenix6.swerve.SwerveDrivetrain.SwerveDriveState;
 import com.ctre.phoenix6.swerve.SwerveRequest;
 import edu.wpi.first.math.Matrix;
@@ -173,6 +174,16 @@ public class Swerve extends SubsystemBase {
             drivetrain.addVisionMeasurement(
                     visionRobotPoseMeters, timestampSeconds, visionMeasurementStdDevs);
         }
+    }
+
+    /** Estimated pose at an FPGA timestamp (e.g. a camera frame's capture time). */
+    public Pose2d samplePoseAt(double fpgaTimestamp) {
+        if (isSwerveDisabled) {
+            return getState().Pose;
+        }
+        return drivetrain
+                .samplePoseAt(Utils.fpgaToCurrentTime(fpgaTimestamp))
+                .orElse(drivetrain.getState().Pose);
     }
 
     public SwerveDriveState getState() {

@@ -10,6 +10,7 @@ import edu.wpi.first.apriltag.AprilTagFieldLayout;
 import edu.wpi.first.apriltag.AprilTagFields;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -19,13 +20,15 @@ import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import igknighters.commands.teleop.TeleopSwerveWithDetune;
 import igknighters.constants.DrivingSharedState;
+import igknighters.constants.FieldConstants;
 import igknighters.constants.FirstBotConsts;
 import igknighters.constants.RobotConsts;
 import igknighters.constants.RobotIdentity;
 import igknighters.constants.SecondBotConsts;
 import igknighters.controllers.DriverController;
 import igknighters.subsystems.LimeLightVision.Localization.LocalizationVision;
-import igknighters.subsystems.Luma.Luma;
+import igknighters.subsystems.LimeLightVision.ObjectDetection.ObjectDetection;
+import igknighters.subsystems.LimeLightVision.ObjectDetection.ObjectDetection.SimObject;
 import igknighters.subsystems.Subsystems;
 import igknighters.subsystems.led.Led;
 import igknighters.subsystems.swerve.Swerve;
@@ -217,8 +220,9 @@ public class Robot extends LoggedRobot {
                 new Subsystems(
                         swerve,
                         new LocalizationVision(swerve, consts.limelightVision().cameras()),
-                        new Led(90, 2),
-                        new Luma(true, "object-detection"));
+                        new ObjectDetection(
+                                swerve, consts.limelightVision().objectDetectionCameras()),
+                        new Led(90, 2));
         setUpSwerve(subsystems);
         pose_pred = new RobotPosePredictor(subsystems.swerve);
         publishCommandsAndSubystems(subsystems);
@@ -243,6 +247,24 @@ public class Robot extends LoggedRobot {
                         .toPose2d();
         subsystems.swerve.resetPose(
                 new Pose2d(tag19.getX() + 2.5, tag19.getY() + 0.18, Rotation2d.kZero));
+        // fuel between the robot and the hub, in view of limelight-back (the detector)
+        for (double[] xy : new double[][] {{1.0, 0.0}, {1.6, 0.5}, {2.2, -0.6}}) {
+            subsystems.objectDetection.simObjects.add(
+                    new SimObject(
+                            "fuel",
+                            new Translation2d(tag19.getX() + 2.5 - xy[0], tag19.getY() + xy[1])));
+        }
+        // and a grid at field center, drive around it to watch objects go seen/unseen
+        for (double dx = -1; dx <= 1; dx++) {
+            for (double dy = -1; dy <= 1; dy++) {
+                subsystems.objectDetection.simObjects.add(
+                        new SimObject(
+                                "fuel",
+                                new Translation2d(
+                                        FieldConstants.X_FIELD / 2 + dx,
+                                        FieldConstants.Y_FIELD / 2 + dy)));
+            }
+        }
         SmartDashboard.putNumber("Sim/HeadingErrorDeg", 45);
         Command breakHeading =
                 Commands.runOnce(

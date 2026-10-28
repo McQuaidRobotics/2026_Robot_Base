@@ -2,7 +2,7 @@ package igknighters.subsystems;
 
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import igknighters.subsystems.LimeLightVision.Localization.LocalizationVision;
-import igknighters.subsystems.Luma.Luma;
+import igknighters.subsystems.LimeLightVision.ObjectDetection.ObjectDetection;
 import igknighters.subsystems.led.Led;
 import igknighters.subsystems.swerve.Swerve;
 
@@ -15,15 +15,16 @@ import igknighters.subsystems.swerve.Swerve;
 public class Subsystems {
     public final Swerve swerve;
     public final LocalizationVision vision;
+    public final ObjectDetection objectDetection;
     public final Led led;
-    public final Luma luma;
     public final SubsystemBase[] lockedResources;
 
-    public Subsystems(Swerve swerve, LocalizationVision vision, Led led, Luma luma) {
+    public Subsystems(
+            Swerve swerve, LocalizationVision vision, ObjectDetection objectDetection, Led led) {
         this.swerve = swerve;
         this.vision = vision;
+        this.objectDetection = objectDetection;
         this.led = led;
-        this.luma = luma;
-        this.lockedResources = new SubsystemBase[] {swerve, luma, vision, led};
+        this.lockedResources = new SubsystemBase[] {swerve, vision, objectDetection, led};
     }
 }

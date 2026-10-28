@@ -1,6 +1,7 @@
 package igknighters.constants;
 
 import igknighters.subsystems.LimeLightVision.CameraConfig;
+import igknighters.subsystems.LimeLightVision.ObjectDetection.ObjectDetectionConfig;
 import igknighters.subsystems.swerve.swerveconstants.CommonSwerveConsts;
 import igknighters.subsystems.swerve.swerveconstants.SwerveConsts;
 import java.util.List;
@@ -44,8 +45,16 @@ public class FirstBotConsts extends RobotConsts {
                     // camera.
                     new CameraConfig("limelight").simMount(-0.2992, 0.2966, 0.335, 15, -135),
                     new CameraConfig("limelight-intake").simMount(0.0445, 0.3079, 0.2057, 15, -68),
-                    new CameraConfig("limelight-back").simMount(-0.3129, -0.2237, 0.1994, 15, 180),
                     new CameraConfig("limelight-left").simMount(-0.2204, -0.3129, 0.1994, 15, 90));
+        }
+
+        @Override
+        public List<ObjectDetectionConfig> objectDetectionCameras() {
+            return List.of(
+                    // 0.075 = fuel radius (5.91 in ball). Labels must match the model's labels
+                    // file order. Mount: same pipeline_0.json numbers as when it localized.
+                    new ObjectDetectionConfig("limelight-back", 0.075, "fuel")
+                            .mount(-0.3129, -0.2237, 0.1994, 15, 180));
         }
 
         @Override

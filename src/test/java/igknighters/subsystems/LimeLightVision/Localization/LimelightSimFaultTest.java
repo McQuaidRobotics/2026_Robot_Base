@@ -1,4 +1,4 @@
-package igknighters.subsystems.LimeLightVision;
+package igknighters.subsystems.LimeLightVision.Localization;
 
 import static igknighters.subsystems.LimeLightVision.Localization.LocalizationVision.NO_TRUST;
 import static igknighters.subsystems.LimeLightVision.Localization.LocalizationVision.measure;
@@ -11,11 +11,10 @@ import edu.wpi.first.hal.HAL;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Transform2d;
+import igknighters.subsystems.LimeLightVision.CameraConfig;
 import igknighters.subsystems.LimeLightVision.Helpers.LimelightHelpers.PoseEstimate;
-import igknighters.subsystems.LimeLightVision.Localization.Limelight;
 import igknighters.subsystems.LimeLightVision.Localization.LocalizationSim.LimelightSim;
 import igknighters.subsystems.LimeLightVision.Localization.LocalizationSim.LimelightSimSettings;
-
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 

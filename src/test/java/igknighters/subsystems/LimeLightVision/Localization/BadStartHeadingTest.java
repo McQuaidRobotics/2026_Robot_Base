@@ -1,4 +1,4 @@
-package igknighters.subsystems.LimeLightVision;
+package igknighters.subsystems.LimeLightVision.Localization;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -14,11 +14,9 @@ import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.simulation.SimHooks;
+import igknighters.subsystems.LimeLightVision.CameraConfig;
 import igknighters.subsystems.LimeLightVision.Helpers.LimelightHelpers.PoseEstimate;
-import igknighters.subsystems.LimeLightVision.Localization.Limelight;
-import igknighters.subsystems.LimeLightVision.Localization.LocalizationVision;
 import igknighters.subsystems.LimeLightVision.Localization.LocalizationSim.LimelightSim;
-
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;

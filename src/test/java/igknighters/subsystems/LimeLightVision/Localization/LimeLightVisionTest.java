@@ -1,4 +1,4 @@
-package igknighters.subsystems.LimeLightVision;
+package igknighters.subsystems.LimeLightVision.Localization;
 
 import static igknighters.subsystems.LimeLightVision.Localization.LocalizationVision.NO_TRUST;
 import static igknighters.subsystems.LimeLightVision.Localization.LocalizationVision.measure;
@@ -7,10 +7,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import igknighters.subsystems.LimeLightVision.CameraConfig;
 import igknighters.subsystems.LimeLightVision.Helpers.LimelightHelpers.PoseEstimate;
 import igknighters.subsystems.LimeLightVision.Helpers.LimelightHelpers.RawFiducial;
-import igknighters.subsystems.LimeLightVision.Localization.LocalizationVision;
-
 import org.junit.jupiter.api.Test;
 
 class LimeLightVisionTest {

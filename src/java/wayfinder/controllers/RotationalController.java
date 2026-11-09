@@ -8,25 +8,13 @@ import wayfinder.controllers.Types.State;
 
 public abstract class RotationalController
         implements Controller<Rotation2d, Double, Rotation2d, Constraints> {
-    // These classes don't use the wpilib classes for a few reasons:
-    // - in order for the trapezoidal profile in wpilib to be dynamic you have to recreate the
-    // object
-    // each cycle
-    // - the wpilib classes are harder to introspect for me with weird behavior
-    // - i wanted to implement them myself to understand them better :3
-    //
-    // If you would like to use this in your own code feel free to implement this using the wpilib
-    // classes
 
-    private static boolean withinTolerance(
+    protected static boolean withinTolerance(
             Rotation2d lhs, Rotation2d rhs, double toleranceRadians) {
         if (Math.abs(toleranceRadians) > Math.PI) {
             return true;
         }
         double dot = lhs.getCos() * rhs.getCos() + lhs.getSin() * rhs.getSin();
-        // cos(θ) >= cos(tolerance) means |θ| <= tolerance, for tolerance in [-pi, pi], as
-        // pre-checked
-        // above.
         return dot > Math.cos(toleranceRadians);
     }
 
@@ -53,26 +41,33 @@ public abstract class RotationalController
 
     private static class Profiled extends RotationalController {
         private final boolean replanning;
+        private final double positionTolerance; // Added for robust physical checking
 
         private double prevError = 0;
         private State prevSetpoint = State.kZero;
 
-        public Profiled(double kP, double kD, boolean replanning) {
+        public Profiled(double kP, double kD, boolean replanning, double positionTolerance) {
             super(kP, kD);
             this.replanning = replanning;
+            this.positionTolerance = positionTolerance;
         }
 
+        @Override
         public boolean isDone(Rotation2d measurement, Rotation2d target) {
-            return MathUtil.isNear(prevSetpoint.position(), target.getRadians(), 0.001)
+            // FIX: Leverages your geometric helper to avoid wrapping bugs
+            // AND ensures the physical robot is actually pointing the right way.
+            return withinTolerance(measurement, target, positionTolerance)
                     && MathUtil.isNear(prevSetpoint.velocity(), 0.0, 0.01);
         }
 
+        @Override
         public Double calculate(
                 double period,
                 Rotation2d measurementGeom,
                 Double measurementVelo,
                 Rotation2d targetGeom,
                 Constraints constraints) {
+
             if (isDone(measurementGeom, targetGeom)) {
                 return 0.0;
             }
@@ -80,11 +75,10 @@ public abstract class RotationalController
             double measurement = measurementGeom.getRadians();
             double target = targetGeom.getRadians();
 
-            // this may not be needed but it doesn't hurt to have it
             measurement = MathUtil.angleModulus(measurement);
             target = MathUtil.angleModulus(target);
 
-            // ensure that the setpoint is always the shortest path to the target
+            // Ensure that the setpoint is always the shortest path to the target
             target = MathUtil.angleModulus(target - measurement) + measurement;
             double wrappedSetpoint =
                     MathUtil.angleModulus(prevSetpoint.position() - measurement) + measurement;
@@ -92,7 +86,7 @@ public abstract class RotationalController
                 prevSetpoint = new State(wrappedSetpoint, prevSetpoint.velocity());
             }
 
-            // calculate an intermediate setpoint based on constraints
+            // Calculate intermediate setpoint based on constraints
             State setpoint =
                     DynamicTrapezoidProfile.calculate(
                             period,
@@ -103,20 +97,20 @@ public abstract class RotationalController
                             constraints.maxVelocity(),
                             constraints.maxAcceleration());
 
-            // calculate the error and derivative of the error
+            // Calculate the error and derivative of the error
             double positionError = MathUtil.angleModulus(prevSetpoint.position() - measurement);
             double errorOverTime = (positionError - prevError) / period;
             prevError = positionError;
 
             prevSetpoint = setpoint;
 
-            // add feedback of the PD controller to the "feedforward" of the setpoint
+            // Add feedback of the PD controller to the feedforward velocity
             double ret = (kP * positionError) + (kD * errorOverTime) + setpoint.velocity();
-            // ensure the feedback controller doesn't exceed the velocity constraints
-            // (acceleration is harder to do and shouldn't really matter)
+
             return MathUtil.clamp(ret, -constraints.maxVelocity(), constraints.maxVelocity());
         }
 
+        @Override
         public void reset(Rotation2d measurement, Double measurementVelo, Rotation2d target) {
             prevError = 0.0;
             prevSetpoint = new State(measurement.getRadians(), measurementVelo);
@@ -125,7 +119,6 @@ public abstract class RotationalController
 
     private static class UnProfiled extends RotationalController {
         private final double deadband;
-
         private double prevError;
 
         public UnProfiled(double kP, double kD, double deadband) {
@@ -133,14 +126,17 @@ public abstract class RotationalController
             this.deadband = deadband;
         }
 
+        @Override
         public boolean isDone(Rotation2d measurement, Rotation2d target) {
             return withinTolerance(measurement, target, deadband);
         }
 
+        @Override
         public void reset(Rotation2d measurement, Double measurementVelo, Rotation2d target) {
             prevError = 0;
         }
 
+        @Override
         public Double calculate(
                 double period,
                 Rotation2d measurementGeom,
@@ -158,12 +154,16 @@ public abstract class RotationalController
             double errorOverTime = (positionError - prevError) / period;
             prevError = positionError;
 
-            return (kP * positionError) + (kD * errorOverTime);
+            double ret = (kP * positionError) + (kD * errorOverTime);
+
+            // FIX: Clamp output to prevent absolute insanity on large unprofiled step-changes
+            return MathUtil.clamp(ret, -constraints.maxVelocity(), constraints.maxVelocity());
         }
     }
 
-    public static RotationalController profiled(double kP, double kD, boolean replanning) {
-        return new Profiled(kP, kD, replanning);
+    public static RotationalController profiled(
+            double kP, double kD, boolean replanning, double positionTolerance) {
+        return new Profiled(kP, kD, replanning, positionTolerance);
     }
 
     public static RotationalController unprofiled(double kP, double kD, double deadband) {

@@ -2,7 +2,6 @@ package wayfinder.setpointGenerator;
 
 import static wayfinder.setpointGenerator.Util.*;
 
-import edu.wpi.first.epilogue.logging.EpilogueBackend;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
@@ -12,6 +11,7 @@ import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.wpilibj.RobotController;
 import java.util.Optional;
+import org.littletonrobotics.junction.Logger;
 import wayfinder.controllers.Types.ChassisConstraints;
 import wayfinder.setpointGenerator.Util.LocalVars;
 import wpilibExt.DCMotorExt;
@@ -32,7 +32,6 @@ public class SwerveSetpointGenerator {
 
     private static final int NUM_MODULES = Util.NUM_MODULES;
 
-    private final EpilogueBackend logger;
     private final SwerveDriveKinematics kinematics;
     private final Translation2d[] moduleLocations;
     private final DCMotorExt driveMotor;
@@ -46,8 +45,21 @@ public class SwerveSetpointGenerator {
             wheelFrictionForce,
             torqueLoss;
 
+    /**
+     * Creates a new SwerveSetpointGenerator.
+     *
+     * @param moduleLocations
+     * @param driveMotor
+     * @param angleMotor
+     * @param driveStatorCurrentLimitAmps
+     * @param driveSupplyCurrentLimitAmps
+     * @param massKg
+     * @param moiKgMetersSquared
+     * @param wheelDiameterMeters
+     * @param wheelCoF
+     * @param torqueLoss
+     */
     public SwerveSetpointGenerator(
-            final EpilogueBackend logger,
             final Translation2d[] moduleLocations,
             final DCMotorExt driveMotor,
             final DCMotor angleMotor,
@@ -63,7 +75,6 @@ public class SwerveSetpointGenerator {
             throw new IllegalArgumentException("Module locations must have 4 elements");
         }
 
-        this.logger = logger;
         this.driveMotor = driveMotor;
         this.driveStatorCurrentLimitAmps = driveStatorCurrentLimitAmps;
         this.driveSupplyCurrentLimitAmps = driveSupplyCurrentLimitAmps;
@@ -103,6 +114,7 @@ public class SwerveSetpointGenerator {
             Speeds desiredSpeeds,
             Optional<ChassisConstraints> constraintsOpt,
             double dt) {
+        double initialTime = RobotController.getFPGATime() / 1000000.0;
         double inputVoltage = RobotController.getBatteryVoltage();
         if (Double.isNaN(inputVoltage)) {
             inputVoltage = 12.0;
@@ -145,18 +157,27 @@ public class SwerveSetpointGenerator {
         vars.constraintsOpt = constraintsOpt;
         vars.inputVoltage = inputVoltage;
 
-        logger.log("beginningVars", vars, LocalVars.struct);
+        Logger.recordOutput("Wayfinder/SwerveSetpointGenerator/BeginningVars/dt", vars.dt);
+        Logger.recordOutput(
+                "Wayfinder/SwerveSetpointGenerator/BeginningVars/prevSpeeds", vars.prevSpeeds);
+        Logger.recordOutput(
+                "Wayfinder/SwerveSetpointGenerator/BeginningVars/desiredSpeeds",
+                vars.desiredSpeeds);
+        Logger.recordOutput(
+                "Wayfinder/SwerveSetpointGenerator/BeginningVars/desiredModuleStates",
+                vars.desiredModuleStates);
+        Logger.recordOutput(
+                "Wayfinder/SwerveSetpointGenerator/BeginningVars/prevModuleStates",
+                vars.prevModuleStates);
+        Logger.recordOutput("Wayfinder/SwerveSetpointGenerator/BeginningVars/minS", vars.minS);
+        Logger.recordOutput(
+                "Wayfinder/SwerveSetpointGenerator/BeginningVars/inputVoltage", vars.inputVoltage);
 
         checkNeedToSteer(vars);
-        logger.log("postCheckNeedToSteer", vars, LocalVars.struct);
         makeVectors(vars);
-        logger.log("pastMakeVectors", vars, LocalVars.struct);
 
         solveSteering(vars);
-        logger.log("postSolveSteering", vars, LocalVars.struct);
-
         solveDriving(vars);
-        logger.log("postSolveDriving", vars, LocalVars.struct);
 
         ChassisSpeeds retSpeeds =
                 ChassisSpeeds.discretize(
@@ -200,8 +221,27 @@ public class SwerveSetpointGenerator {
                             deltaVelocity / dt);
         }
 
-        logger.log("finalVars", vars, LocalVars.struct);
+        Logger.recordOutput("Wayfinder/SwerveSetpointGenerator/Final_Vars/dt", vars.dt);
+        Logger.recordOutput(
+                "Wayfinder/SwerveSetpointGenerator/Final_Vars/prevSpeeds", vars.prevSpeeds);
+        Logger.recordOutput(
+                "Wayfinder/SwerveSetpointGenerator/Final_Vars/desiredSpeeds", vars.desiredSpeeds);
+        Logger.recordOutput(
+                "Wayfinder/SwerveSetpointGenerator/Final_Vars/desiredModuleStates",
+                vars.desiredModuleStates);
+        Logger.recordOutput(
+                "Wayfinder/SwerveSetpointGenerator/Final_Vars/prevModuleStates",
+                vars.prevModuleStates);
+        Logger.recordOutput("Wayfinder/SwerveSetpointGenerator/Final_Vars/minS", vars.minS);
+        Logger.recordOutput(
+                "Wayfinder/SwerveSetpointGenerator/Final_Vars/inputVoltage", vars.inputVoltage);
+        double finalTime = RobotController.getFPGATime() / 1000000.0;
 
+        if (finalTime - initialTime > 0.01) {
+            System.out.println("-------------------------------------------------");
+            System.out.println("Setpoint generation time: " + (finalTime - initialTime));
+            System.out.println("-------------------------------------------------");
+        }
         return new SwerveSetpoint(Speeds.fromRobotRelative(retSpeeds), outputStates, heading);
     }
 

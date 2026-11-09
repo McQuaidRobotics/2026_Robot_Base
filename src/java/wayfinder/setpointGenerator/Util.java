@@ -5,14 +5,8 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
-import edu.wpi.first.util.struct.Struct;
-import edu.wpi.first.util.struct.StructSerializable;
-import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Optional;
-import monologue.ProceduralStructGenerator;
-import monologue.ProceduralStructGenerator.FixedSizeArray;
-import monologue.ProceduralStructGenerator.IgnoreStructField;
 import wayfinder.controllers.Types.ChassisConstraints;
 import wpilibExt.Speeds.FieldSpeeds;
 
@@ -195,62 +189,7 @@ class Util {
         return rotateBy(unaryMinusPrevRads, Math.cos(desiredRads), Math.sin(desiredRads));
     }
 
-    private static final Struct<LocalVectors> structVectors;
-    private static final Struct<LocalVars> structVars;
-
-    static {
-        final var structVectorsProc =
-                ProceduralStructGenerator.genObject(LocalVectors.class, LocalVectors::new);
-        structVectors =
-                new Struct<Util.LocalVectors>() {
-                    @Override
-                    public String getSchema() {
-                        return "float64 vx;float64 vy;float64 cos;float64 sin;";
-                    }
-
-                    @Override
-                    public int getSize() {
-                        return 32;
-                    }
-
-                    @Override
-                    public Class<LocalVectors> getTypeClass() {
-                        return LocalVectors.class;
-                    }
-
-                    @Override
-                    public String getTypeName() {
-                        return "LocalVectors";
-                    }
-
-                    @Override
-                    public void pack(ByteBuffer bb, LocalVectors value) {
-                        bb.putDouble(value.vx);
-                        bb.putDouble(value.vy);
-                        bb.putDouble(value.cos);
-                        bb.putDouble(value.sin);
-                    }
-
-                    @Override
-                    public LocalVectors unpack(ByteBuffer bb) {
-                        return structVectorsProc.unpack(bb);
-                    }
-
-                    @Override
-                    public String toString() {
-                        return this.getTypeName()
-                                + "<"
-                                + this.getSize()
-                                + ">"
-                                + " {"
-                                + this.getSchema()
-                                + "}";
-                    }
-                };
-        structVars = ProceduralStructGenerator.genObject(LocalVars.class, LocalVars::new);
-    }
-
-    static final class LocalVectors implements StructSerializable {
+    static final class LocalVectors {
         public double vx, vy, cos, sin;
 
         public LocalVectors() {}
@@ -281,15 +220,10 @@ class Util {
         public double radians() {
             return Math.atan2(sin, cos);
         }
-
-        public static final Struct<LocalVectors> struct = structVectors;
     }
 
-    static final class LocalVars implements StructSerializable {
-        @FixedSizeArray(size = NUM_MODULES)
+    static final class LocalVars {
         public LocalVectors[] prev;
-
-        @FixedSizeArray(size = NUM_MODULES)
         public LocalVectors[] desired;
 
         public boolean needToSteer = true;
@@ -297,15 +231,12 @@ class Util {
         public double dx, dy, dtheta;
         public ChassisSpeeds prevSpeeds, desiredSpeeds;
         public double inputVoltage;
-        @IgnoreStructField public Optional<ChassisConstraints> constraintsOpt;
+        public Optional<ChassisConstraints> constraintsOpt;
 
-        @FixedSizeArray(size = NUM_MODULES)
         public SwerveModuleState[] prevModuleStates;
-
-        @FixedSizeArray(size = NUM_MODULES)
         public SwerveModuleState[] desiredModuleStates;
 
-        @IgnoreStructField public Rotation2d[] steeringOverride;
+        public Rotation2d[] steeringOverride;
 
         public LocalVars() {
             desiredSpeeds = prevSpeeds = new ChassisSpeeds();
@@ -330,8 +261,6 @@ class Util {
 
             return this;
         }
-
-        public static final Struct<LocalVars> struct = structVars;
     }
 
     static ChassisSpeeds constrainSpeeds(
@@ -391,15 +320,4 @@ class Util {
 
         return ChassisSpeeds.fromFieldRelativeSpeeds(output, heading);
     }
-
-    // private static void mutateToRobotRelative(ChassisSpeeds speeds, Rotation2d robotAngle) {
-    //   double newVX =
-    //       speeds.vxMetersPerSecond * robotAngle.getCos()
-    //           - speeds.vyMetersPerSecond * robotAngle.getSin();
-    //   double newVY =
-    //       speeds.vxMetersPerSecond * robotAngle.getSin()
-    //           + speeds.vyMetersPerSecond * robotAngle.getCos();
-    //   speeds.vxMetersPerSecond = newVX;
-    //   speeds.vyMetersPerSecond = newVY;
-    // }
 }

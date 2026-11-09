@@ -10,7 +10,6 @@ import com.ctre.phoenix6.swerve.SwerveRequest.ForwardPerspectiveValue;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.wpilibj2.command.Command;
 import igknighters.Robot;
-import igknighters.constants.DrivingSharedState;
 import igknighters.subsystems.swerve.Swerve;
 import wayfinder.WayfinderManager;
 import wayfinder.controllers.Types.ChassisConstraints;
@@ -45,7 +44,10 @@ public class BigBoyWayfinderCommands {
                                             targetPose,
                                             new ChassisConstraints(
                                                     new Constraints(
-                                                            Robot.consts.swerve().getCommonSwerveConsts().getMaxSpeedMetersPerSecond()
+                                                            Robot.consts
+                                                                            .swerve()
+                                                                            .getCommonSwerveConsts()
+                                                                            .getMaxSpeedMetersPerSecond()
                                                                     / 2,
                                                             4,
                                                             8),
@@ -62,7 +64,6 @@ public class BigBoyWayfinderCommands {
                                             .withRotationalRate(RadiansPerSecond.of(omega)));
                         })
                 .until(SwerveCommands.isAt(swerve, targetPose, 0.1, 0.1))
-                .finallyDo(
-                        () -> System.out.println("FINISHING DRIVING"));
+                .finallyDo(() -> System.out.println("FINISHING DRIVING"));
     }
 }

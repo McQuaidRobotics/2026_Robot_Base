@@ -53,9 +53,22 @@ public class WayfinderManager {
         refreshPlanner();
     }
 
-    /** Remove all obstacles from the field. */
-    public static void clearObstacles() {
-        registeredObstacles.clear();
+    public static ArrayList<Double> addObstaclesAndReturnIndex(Obstacle[] obs) {
+        ArrayList<Double> indices = new ArrayList<>();
+        for (Obstacle o : obs) {
+            registeredObstacles.add(o);
+            indices.add((double) registeredObstacles.size() - 1);
+        }
+        refreshPlanner();
+        return indices; // return them so they can be removed later
+    }
+
+    /** Remove an obstacle from the field using its index. */
+    public static void removeObstacles(ArrayList<Double> indices) {
+        indices.sort((a, b) -> b.compareTo(a)); // Sort in descending order to avoid index shifting issues
+        for (Double index : indices) {
+            registeredObstacles.remove(index.intValue());
+        }
         refreshPlanner();
     }
 

@@ -21,6 +21,7 @@ import igknighters.constants.RobotConsts;
 import igknighters.constants.RobotIdentity;
 import igknighters.constants.SecondBotConsts;
 import igknighters.controllers.DriverController;
+import igknighters.controllers.DriverController.DebugType;
 import igknighters.subsystems.LimeLightVision.LimeLightVision;
 import igknighters.subsystems.Luma.Luma;
 import igknighters.subsystems.Subsystems;
@@ -201,7 +202,7 @@ public class Robot extends LoggedRobot {
     }
 
     public Robot() {
-        this(false);
+        this(true);
     }
 
     public Robot(boolean isSwerveDisabled) {
@@ -256,7 +257,7 @@ public class Robot extends LoggedRobot {
     }
 
     public void bindDriverController() {
-        driverController.bind(subsystems);
+        driverController.bind(subsystems, DebugType.LED);
     }
 
     @Override

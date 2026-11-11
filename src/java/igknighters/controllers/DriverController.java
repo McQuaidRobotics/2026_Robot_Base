@@ -6,9 +6,11 @@ import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.GenericHID.RumbleType;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
+import igknighters.commands.LEDCommands;
 import igknighters.commands.SwerveCommands;
 import igknighters.commands.Wayfinder;
 import igknighters.subsystems.Subsystems;
+import igknighters.subsystems.led.LedUtil;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 
@@ -91,7 +93,8 @@ public class DriverController {
     }
 
     public static enum DebugType {
-        SWERVE;
+        SWERVE,
+        LED;
     }
 
     public void bind(final Subsystems subsystems, DebugType debugType) {
@@ -99,6 +102,9 @@ public class DriverController {
 
         if (debugType == DebugType.SWERVE) {
             this.X.whileTrue(Wayfinder.driveToTarget(swerve, new Pose2d(3, 1, new Rotation2d(0))));
+        }
+        if (debugType == DebugType.LED) {
+            this.X.whileFalse(LEDCommands.run(subsystems.led, LedUtil.makeRainbow(255, 255)));
         } else {
             throw new IllegalArgumentException("UNKNOWN DEBUG TYPE: " + debugType);
         }

@@ -46,6 +46,9 @@ public class FieldVisualizer {
     private final DoubleArrayPublisher drivingTargetPub =
             table.getDoubleArrayTopic("drivingTargetPose").publish();
 
+    private final DoubleArrayPublisher drivingPredPub =
+            table.getDoubleArrayTopic("drivingPredPose").publish();
+
     private final DoubleArrayPublisher detectedObjectsPub =
             table.getDoubleArrayTopic("detectedObjects").publish();
 
@@ -71,6 +74,11 @@ public class FieldVisualizer {
             return;
         }
         drivingTargetPub.set(
+                new double[] {target.getX(), target.getY(), target.getRotation().getDegrees()});
+    }
+
+    public void updatePoseTarget(Pose2d target) {
+        drivingPredPub.set(
                 new double[] {target.getX(), target.getY(), target.getRotation().getDegrees()});
     }
 

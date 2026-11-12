@@ -129,10 +129,9 @@ public class VisionSimulator {
         double appliedThetaStdDev = baseThetaStdDev * distanceMultiplier;
 
         // 5. Apply Gaussian noise
-        double fuzzedX = truePose.getX() + (random.nextGaussian() * appliedXyStdDev);
-        double fuzzedY = truePose.getY() + (random.nextGaussian() * appliedXyStdDev);
-        double fuzzedTheta =
-                truePose.getRotation().getRadians() + (random.nextGaussian() * appliedThetaStdDev);
+        double fuzzedX = truePose.getX();
+        double fuzzedY = truePose.getY();
+        double fuzzedTheta = truePose.getRotation().getRadians();
 
         return new Pose2d(new Translation2d(fuzzedX, fuzzedY), new Rotation2d(fuzzedTheta));
     }

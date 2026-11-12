@@ -30,6 +30,7 @@ import igknighters.util.RobotPosePredictor;
 import igknighters.util.TunableValues;
 import igknighters.util.TunableValues.TunableDouble;
 import igknighters.util.log.Log;
+import igknighters.util.prediction.PosePredictor;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Optional;
@@ -57,12 +58,13 @@ public class Robot extends LoggedRobot {
     private final CommandScheduler scheduler = CommandScheduler.getInstance();
     public static RobotPosePredictor pose_pred;
     public static RobotPosePredError pose_pred_error = new RobotPosePredError();
+    public static PosePredictor pose_predictor;
 
     private final DriverController driverController = new DriverController(0);
 
     public final Subsystems subsystems;
 
-    private final boolean kUseLimelight = true;
+    private final boolean kUseLimelight = false;
 
     private Telemetry logger;
     TunableDouble detune = TunableValues.getDouble("Tunables/Detune", 1.0);
@@ -213,6 +215,9 @@ public class Robot extends LoggedRobot {
                         new LimeLightVision(),
                         new Led(90, 2),
                         new Luma(true, "object-detection"));
+
+        pose_predictor = new PosePredictor(subsystems.swerve);
+
         setUpSwerve(subsystems);
         pose_pred = new RobotPosePredictor(subsystems.swerve);
         publishCommandsAndSubystems(subsystems);

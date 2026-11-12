@@ -4,6 +4,7 @@ import choreo.Choreo.TrajectoryLogger;
 import choreo.auto.AutoFactory;
 import choreo.auto.AutoTrajectory;
 import choreo.trajectory.SwerveSample;
+import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.Utils;
 import com.ctre.phoenix6.swerve.SwerveDrivetrain.SwerveDriveState;
 import com.ctre.phoenix6.swerve.SwerveRequest;
@@ -28,6 +29,8 @@ public class Swerve extends SubsystemBase {
     CommonSwerveConsts commonSwerveConsts;
     boolean isSwerveDisabled = false;
     DummySwerve dummySwerve = new DummySwerve();
+    // Cached so each loop skips Phoenix's synchronized signal lookup
+    private StatusSignal<?> accelX, accelY, angularVelocityZ;
 
     public Swerve() {
         this(false);
@@ -38,6 +41,9 @@ public class Swerve extends SubsystemBase {
         if (!isSwerveDisabled) {
             drivetrain = Robot.consts.swerve().getCommonSwerveConsts().createDrivetrain(this);
             commonSwerveConsts = Robot.consts.swerve().getCommonSwerveConsts();
+            accelX = drivetrain.getPigeon2().getAccelerationX();
+            accelY = drivetrain.getPigeon2().getAccelerationY();
+            angularVelocityZ = drivetrain.getPigeon2().getAngularVelocityZDevice();
         }
     }
 
@@ -164,7 +170,7 @@ public class Swerve extends SubsystemBase {
 
     public double getXAcceleration() {
         if (!isSwerveDisabled) {
-            return drivetrain.getPigeon2().getAccelerationX().getValueAsDouble();
+            return accelX.refresh().getValueAsDouble();
         } else {
             return 0.0;
         }
@@ -172,7 +178,7 @@ public class Swerve extends SubsystemBase {
 
     public double getYAcceleration() {
         if (!isSwerveDisabled) {
-            return drivetrain.getPigeon2().getAccelerationY().getValueAsDouble();
+            return accelY.refresh().getValueAsDouble();
         } else {
             return 0.0;
         }
@@ -180,8 +186,7 @@ public class Swerve extends SubsystemBase {
 
     public double getRotationalVelocity() {
         if (!isSwerveDisabled) {
-            return drivetrain.getPigeon2().getAngularVelocityZDevice().getValueAsDouble()
-                    * Conv.DEGREES_TO_RADIANS;
+            return angularVelocityZ.refresh().getValueAsDouble() * Conv.DEGREES_TO_RADIANS;
         } else {
             return 0.0;
         }

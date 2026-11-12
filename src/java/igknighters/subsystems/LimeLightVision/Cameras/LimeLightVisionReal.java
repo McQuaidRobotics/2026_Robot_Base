@@ -16,6 +16,8 @@ public class LimeLightVisionReal extends LimeLights {
     private final List<String> cameraNames;
     private double lastTimeStamp = 0.0;
     private final List<Integer> visibleTagIds = new ArrayList<>();
+    // Read by the swerve telemetry thread, so it only ever sees a finished, immutable list
+    private volatile List<Integer> visibleTagIdsSnapshot = List.of();
 
     public LimeLightVisionReal(String... cameraNames) {
         this.cameraNames = new ArrayList<>();
@@ -40,12 +42,15 @@ public class LimeLightVisionReal extends LimeLights {
         List<Pose2d> poses = new ArrayList<>();
         double timestampSum = 0.0;
         visibleTagIds.clear();
+        // Feed gyro to every Limelight (for MT2), then flush NT once instead of once per camera
+        for (String cameraName : cameraNames) {
+            LimelightHelpers.SetRobotOrientation_NoFlush(
+                    cameraName, yaw, yawRate, pitch, pitchRate, roll, rollRate);
+        }
+        LimelightHelpers.Flush();
         // mode breakdown
         // 1 = make internal match gyro
         for (String cameraName : cameraNames) {
-            // Feed gyro to Limelight (for MT2)
-            LimelightHelpers.SetRobotOrientation(
-                    cameraName, yaw, yawRate, pitch, pitchRate, roll, rollRate);
 
             // Get both MT2 and MT1 estimates
             var mt2Estimate = LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2(cameraName);
@@ -112,6 +117,7 @@ public class LimeLightVisionReal extends LimeLights {
                     visibleTagIds.size());
         }
 
+        visibleTagIdsSnapshot = List.copyOf(visibleTagIds);
         return PoseAverager.averagePose2ds(poses);
     }
 
@@ -126,7 +132,7 @@ public class LimeLightVisionReal extends LimeLights {
 
     /** Returns a list of visible tag IDs in the current frame. */
     public List<Integer> getVisibleTagIds() {
-        return visibleTagIds;
+        return visibleTagIdsSnapshot;
     }
 
     public double timeSinceLastSample() {

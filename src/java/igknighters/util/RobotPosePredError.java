@@ -5,8 +5,6 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.Timer;
 import igknighters.Robot;
 import igknighters.util.log.Log;
-import java.util.Arrays;
-import java.util.Collections;
 
 public class RobotPosePredError {
     Pose2d[] predictionHistory = new Pose2d[2];
@@ -31,8 +29,7 @@ public class RobotPosePredError {
     }
 
     public double[] findError(Pose2d actualPose) {
-        double prevTimestamp = Collections.min(Arrays.stream(timestampHistory).boxed().toList());
-        int latestIdx = Arrays.stream(timestampHistory).boxed().toList().indexOf(prevTimestamp);
+        int latestIdx = RobotPosePredictor.indexOfMin(timestampHistory);
         double[] errors = new double[3];
         errors[0] =
                 Math.abs(

@@ -13,8 +13,6 @@ import igknighters.Robot;
 import igknighters.subsystems.swerve.Swerve;
 import igknighters.util.Merging.PoseMerger;
 import igknighters.util.Merging.SpeedsMerger;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.Optional;
 
 /**
@@ -97,16 +95,6 @@ public class RobotPosePredictor {
         veloHistory[writeIndex].vxMetersPerSecond = chassisSpeeds.vxMetersPerSecond;
         veloHistory[writeIndex].vyMetersPerSecond = chassisSpeeds.vyMetersPerSecond;
         timestampHistory[writeIndex] = now;
-        double mostRecentTimestamp =
-                Collections.max(Arrays.stream(timestampHistory).boxed().toList());
-        int latestIdx =
-                Arrays.stream(timestampHistory).boxed().toList().indexOf(mostRecentTimestamp);
-        int prevIdx = 0;
-        if (latestIdx == 0) {
-            prevIdx = HISTORY_SIZE - 1;
-        } else {
-            prevIdx = latestIdx - 1;
-        }
         writeIndex = (writeIndex + 1) % HISTORY_SIZE;
         storedCount++;
         // if (veloHistory[HISTORY_SIZE - 1] != null) {
@@ -116,10 +104,7 @@ public class RobotPosePredictor {
 
     public Pose2d getPredictedPose() {
 
-        double mostRecentTimestamp =
-                Collections.max(Arrays.stream(timestampHistory).boxed().toList());
-        int latestIdx =
-                Arrays.stream(timestampHistory).boxed().toList().indexOf(mostRecentTimestamp);
+        int latestIdx = indexOfMax(timestampHistory);
         int prevIdx = 0;
         if (latestIdx == 0) {
             prevIdx = HISTORY_SIZE - 1;
@@ -169,10 +154,7 @@ public class RobotPosePredictor {
 
     public ChassisSpeeds getPredictedVelos() {
         ChassisSpeeds predictedVelo = new ChassisSpeeds();
-        double mostRecentTimestamp =
-                Collections.max(Arrays.stream(timestampHistory).boxed().toList());
-        int latestIdx =
-                Arrays.stream(timestampHistory).boxed().toList().indexOf(mostRecentTimestamp);
+        int latestIdx = indexOfMax(timestampHistory);
         double predictedRotAcc = getCalculatedRotAcceleration();
         predictedVelo.vxMetersPerSecond =
                 veloHistory[latestIdx].vxMetersPerSecond + accelerationsNow[0] * predTime;
@@ -186,10 +168,7 @@ public class RobotPosePredictor {
 
     public double getCalculatedRotAcceleration() {
         ChassisSpeeds predictedAcc = new ChassisSpeeds();
-        double mostRecentTimestamp =
-                Collections.max(Arrays.stream(timestampHistory).boxed().toList());
-        int latestIdx =
-                Arrays.stream(timestampHistory).boxed().toList().indexOf(mostRecentTimestamp);
+        int latestIdx = indexOfMax(timestampHistory);
         int prevIdx = 0;
         if (latestIdx == 0) {
             prevIdx = HISTORY_SIZE - 1;
@@ -207,6 +186,24 @@ public class RobotPosePredictor {
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    /** Index of the first largest value (same as boxing + Collections.max + indexOf). */
+    static int indexOfMax(double[] values) {
+        int best = 0;
+        for (int i = 1; i < values.length; i++) {
+            if (values[i] > values[best]) best = i;
+        }
+        return best;
+    }
+
+    /** Index of the first smallest value (same as boxing + Collections.min + indexOf). */
+    static int indexOfMin(double[] values) {
+        int best = 0;
+        for (int i = 1; i < values.length; i++) {
+            if (values[i] < values[best]) best = i;
+        }
+        return best;
+    }
 
     /** Decomposes a Pose2d into [x, y, rotation]. */
     private static double[] poseToComponents(Pose2d pose) {

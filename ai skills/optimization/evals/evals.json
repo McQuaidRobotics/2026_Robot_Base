@@ -1,0 +1,50 @@
+{
+  "skill_name": "frc-loop-overrun",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "our robot keeps spamming loop overruns, here's a chunk of the riolog from the rio: C:\\Users\\henry\\.claude\\skills\\frc-loop-overrun-workspace\\inputs\riolog.txt . The robot code is at <REPO>. Robot isn't connected right now so you can't profile it live. Find what's actually causing the overruns in the code and fix it, but DO NOT break any functionality. Dont deploy or commit.",
+      "expected_output": "Identifies CTRE StatusSignal lookups, repeated swerve getState, Limelight per-camera NT flush, SmartDashboard/telemetry re-registration etc.; applies behavior-preserving fixes; build/tests pass; explains that live profiling is needed to confirm.",
+      "files": [
+        "C:\\Users\\henry\\.claude\\skills\\frc-loop-overrun-workspace\\inputs\\riolog.txt"
+      ],
+      "assertions": [
+        "Caches CTRE StatusSignals in fields or removes redundant .refresh() calls",
+        "Replaces per-camera Limelight NT flush with a single flush",
+        "Reduces repeated swerve getState() calls in robotPeriodic",
+        "No logged key, command, or NT topic removed/renamed (behavior preserved)",
+        "./gradlew build succeeds",
+        "Report states the fixes are unverified until profiled on the real robot"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I recorded a flight recording off our roboRIO with visualvm-style jfr: C:\\Users\\henry\\.claude\\skills\\frc-loop-overrun-workspace\\inputs\rio_profile.jfr . What is eating our main robot loop? Give me a breakdown I can show the team. Don't change any code.",
+      "expected_output": "Reports main thread ~71% busy; AdvantageKit log cycle ~30%; CTRE status signal lookup+refresh ~25%; SmartDashboard ~11%; robotPeriodic/CommandScheduler shares; actionable recommendations.",
+      "files": [
+        "C:\\Users\\henry\\.claude\\skills\\frc-loop-overrun-workspace\\inputs\\rio_profile.jfr"
+      ],
+      "assertions": [
+        "Reports main-loop busy share of roughly 65-75%",
+        "Identifies AdvantageKit log cycle (Logger.periodicAfterUser) as the largest bucket (~25-35%)",
+        "Calls out CTRE StatusSignal lookup/refresh as a major cost",
+        "Mentions SmartDashboard.updateValues as a notable cost",
+        "Does not modify any code"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "In our FRC robot code at <REPO>, src/java/igknighters/Telemetry.java is registered as the CTRE swerve telemetry callback (it runs on the odometry thread). We're fighting loop overruns on the roborio. Is this telemetry function part of the problem? Fix whatever's worth fixing without changing what gets published. Don't deploy or commit.",
+      "expected_output": "Notes it runs at 100-250Hz on the odometry thread competing for the 2 RIO cores; moves SmartDashboard.putData to constructor; precomputes static tag poses / avoids per-tick allocation; handles cross-thread visibleIds safely; output topics unchanged; build passes.",
+      "files": [],
+      "assertions": [
+        "Explains it runs at 100-250 Hz on the odometry thread competing for the RIO's 2 cores",
+        "Moves SmartDashboard.putData out of the per-tick path",
+        "Stops rebuilding static AprilTag poses every tick",
+        "Does not introduce a cross-thread race on visibleIds (sizes and fills arrays from one snapshot or equivalent)",
+        "Same NT topics still published",
+        "./gradlew build succeeds"
+      ]
+    }
+  ]
+}
